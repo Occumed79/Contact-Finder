@@ -86,17 +86,59 @@ export async function searchSerper(query: string): Promise<ApiSearchResult> {
       data.organic.forEach((item: any) => {
         if (item.snippet) snippets.push(item.snippet)
         if (item.link) urls.push(item.link)
+        if (item.title) snippets.push(item.title)
       })
     }
 
     if (data.peopleAlsoAsk) {
       data.peopleAlsoAsk.forEach((item: any) => {
         if (item.snippet) snippets.push(item.snippet)
+        if (item.title) snippets.push(item.title)
+        if (item.answer) snippets.push(item.answer)
       })
     }
 
+    if (data.answerBox) {
+      if (data.answerBox.snippet) snippets.push(data.answerBox.snippet)
+      if (data.answerBox.title) snippets.push(data.answerBox.title)
+      if (data.answerBox.answer) snippets.push(data.answerBox.answer)
+    }
+
+    if (data.knowledgeGraph) {
+      if (data.knowledgeGraph.description) snippets.push(data.knowledgeGraph.description)
+      if (data.knowledgeGraph.descriptionLink) urls.push(data.knowledgeGraph.descriptionLink)
+    }
+
+    if (data.relatedSearches) {
+      data.relatedSearches.forEach((item: any) => {
+        if (item.query) snippets.push(item.query)
+      })
+    }
+
+    const combinedText = snippets.join(' ')
+    console.log('Serper extracted text length:', combinedText.length)
+
+    // Also try to scrape the top 3 URLs for contact info
+    let scrapedText = ''
+    for (const url of urls.slice(0, 3)) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
+        if (res.ok) {
+          const html = await res.text()
+          // Simple text extraction
+          const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
+          scrapedText += text + ' '
+        }
+      } catch {
+        // Continue to next URL
+      }
+    }
+
+    const finalText = combinedText + ' ' + scrapedText
+    console.log('Final text length with scraped URLs:', finalText.length)
+
     return {
-      text: snippets.join(' '),
+      text: finalText,
       urls,
       source: 'Serper',
       success: true,

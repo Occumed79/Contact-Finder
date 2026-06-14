@@ -2,6 +2,7 @@ import { getPlaywrightScraper, closePlaywrightScraper, type PlaywrightScrapeResu
 import { fetchViaCorsProxy, searchGoogleViaProxy, searchBingViaProxy, searchDuckDuckGoViaProxy, type CorsProxyResult } from './cors-proxy-scraper'
 import { searchAllApis, type ApiSearchResult } from './api-scraper'
 import { scrapeAllDirectSources, type DirectScrapeResult } from './direct-scraper'
+import { searchScrapeGraphAI, scrapeGraphAIDirectSearch, type ScrapeGraphResult } from './scrapegraph-scraper'
 import { extractEmails, extractPhones, extractLinkedIn, extractWebsites, extractFax } from '../search'
 import type { Vertical } from '../intelligence'
 
@@ -21,6 +22,7 @@ export interface MultiDimensionResult {
     corsProxy: { success: boolean; sources: string[] }
     api: { success: boolean; sources: string[] }
     direct: { success: boolean; sources: string[] }
+    scrapegraph: { success: boolean; sources: string[] }
   }
   totalMethodsAttempted: number
   successfulMethods: number
@@ -39,6 +41,7 @@ export async function multiDimensionSearch(
     corsProxy: { success: false, sources: [] },
     api: { success: false, sources: [] },
     direct: { success: false, sources: [] },
+    scrapegraph: { success: false, sources: [] },
   }
 
   let id = 1
@@ -224,16 +227,51 @@ export async function multiDimensionSearch(
     console.error('Direct scraping dimension failed:', error)
   }
 
+  // ── Dimension 5: ScrapeGraphAI ──
+  try {
+    const [sgResult, sgDirectResult] = await Promise.allSettled([
+      searchScrapeGraphAI(query),
+      scrapeGraphAIDirectSearch(query),
+    ])
+
+    if (sgResult.status === 'fulfilled' && sgResult.value.success) {
+      methodBreakdown.scrapegraph.success = true
+      methodBreakdown.scrapegraph.sources.push('ScrapeGraphAI')
+      rawTexts.push(sgResult.value.text)
+
+      for (const contact of sgResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'ScrapeGraphAI', 93)
+      }
+
+      sources.push('ScrapeGraphAI')
+    }
+
+    if (sgDirectResult.status === 'fulfilled' && sgDirectResult.value.success) {
+      methodBreakdown.scrapegraph.success = true
+      methodBreakdown.scrapegraph.sources.push('ScrapeGraphAI Direct')
+      rawTexts.push(sgDirectResult.value.text)
+
+      for (const contact of sgDirectResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'ScrapeGraphAI Direct', 93)
+      }
+
+      sources.push('ScrapeGraphAI Direct')
+    }
+  } catch (error) {
+    console.error('ScrapeGraphAI dimension failed:', error)
+  }
+
   // ── Cleanup ──
   await closePlaywrightScraper()
 
   // ── Calculate stats ──
-  const totalMethodsAttempted = 4
+  const totalMethodsAttempted = 5
   const successfulMethods = [
     methodBreakdown.playwright.success,
     methodBreakdown.corsProxy.success,
     methodBreakdown.api.success,
     methodBreakdown.direct.success,
+    methodBreakdown.scrapegraph.success,
   ].filter(Boolean).length
 
   return {

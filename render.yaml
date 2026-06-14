@@ -16,3 +16,11 @@ services:
         value: "false"
       - key: ENABLE_OCR
         value: "false"
+      - key: SERPER_API_KEY
+        sync: false
+      - key: SERPAPI_KEY
+        sync: false
+      - key: SCRAPEGRAPHAI_API_KEY
+        sync: false
+      - key: ADDITIONAL_API_KEY
+        sync: false
