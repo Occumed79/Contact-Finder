@@ -65,7 +65,7 @@ export interface AIInsight {
 export interface SearchHistoryItem {
   id: string;
   query: string;
-  timestamp: Date;
+  timestamp: string;
   filters: SearchFilters;
   resultCount: number;
   starred: boolean;
@@ -77,7 +77,7 @@ export interface BookmarkItem {
   url: string;
   description: string;
   tags: string[];
-  createdAt: Date;
+  createdAt: string;
   folder: string;
 }
 

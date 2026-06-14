@@ -98,7 +98,9 @@ export default function BookmarksPage() {
                   <div className="flex items-start gap-4">
                     <div className="mt-1">
                       <img
-                        src={`https://www.google.com/s2/favicons?domain=${new URL(item.url).hostname}&sz=32`}
+                        src={`https://www.google.com/s2/favicons?domain=${(() => {
+                          try { return new URL(item.url).hostname; } catch { return "example.com"; }
+                        })()}&sz=32`}
                         alt=""
                         className="w-5 h-5 rounded"
                         onError={(e) => {
