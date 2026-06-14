@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { type IntelligenceObject, type Vertical, type SearchSuggestion } from "@/types/search";
+import { type IntelligenceObject, type Vertical, type SearchSuggestion } from "../types/search";
 
 interface UseSearchReturn {
   query: string;

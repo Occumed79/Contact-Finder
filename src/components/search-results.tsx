@@ -2,11 +2,11 @@
 
 import React from "react";
 import { ExternalLink, Star, Clock, Globe, Bookmark } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { SearchResult, ViewMode } from "@/types/search";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { SearchResult, ViewMode } from "../types/search";
+import { useLocalStorage } from "../hooks/use-local-storage";
 
 interface SearchResultsProps {
   results: SearchResult[];

@@ -2,8 +2,8 @@
 
 import React from "react";
 import { X, Command, Search, ArrowUp, ArrowDown, Filter, Bookmark, Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
 
 interface KeyboardShortcutsProps {
   isOpen: boolean;

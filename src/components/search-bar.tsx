@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Search, X, Sparkles, Command, ArrowRight, Clock, TrendingUp } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { SearchSuggestion } from "@/types/search";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { SearchSuggestion } from "../types/search";
 
 interface SearchBarProps {
   query: string;

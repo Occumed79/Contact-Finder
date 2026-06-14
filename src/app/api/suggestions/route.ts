@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SearchSuggestion } from "@/types/search";
+import { SearchSuggestion } from "../../../types/search";
 
 function generateSuggestions(query: string): SearchSuggestion[] {
   const words = query.split(/\s+/).filter(w => w.length > 2);

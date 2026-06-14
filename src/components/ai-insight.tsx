@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 import { Sparkles, ChevronDown, ChevronUp, Check, Copy, Zap, TrendingUp } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { AIInsight } from "@/types/search";
+import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { AIInsight } from "../types/search";
 
 interface AIInsightProps {
   insight: AIInsight | null;

@@ -2,9 +2,9 @@
 
 import React from "react";
 import { SlidersHorizontal, X, Globe, Clock, FileText, Shield, ImageIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { SearchFilters, SearchSource } from "@/types/search";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { SearchFilters, SearchSource } from "../types/search";
 
 interface FilterPanelProps {
   filters: SearchFilters;

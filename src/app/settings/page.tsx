@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Header } from "@/components/header";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Switch } from "../../components/ui/switch";
+import { Header } from "../../components/header";
 import { useTheme } from "next-themes";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import { UserSettings, SearchSource } from "@/types/search";
+import { useLocalStorage } from "../../hooks/use-local-storage";
+import { UserSettings, SearchSource } from "../../types/search";
 
 const defaultSettings: UserSettings = {
   theme: "system",

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Search, Settings, History, Bookmark, Moon, Sun, Zap, Keyboard, Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchIntelligence, generateMockResults, type Vertical } from "@/lib/search";
+import { searchIntelligence, generateMockResults, type Vertical } from "../../../lib/search";
 
 export async function POST(request: NextRequest) {
   try {
