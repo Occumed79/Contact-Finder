@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Search, Settings, History, Bookmark, Moon, Sun, Zap, Keyboard, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -12,7 +12,12 @@ interface HeaderProps {
 }
 
 export function Header({ onToggleFilters, onToggleShortcuts }: HeaderProps) {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
@@ -60,7 +65,9 @@ export function Header({ onToggleFilters, onToggleShortcuts }: HeaderProps) {
             className="h-8 w-8"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === "dark" ? (
+            {!mounted ? (
+              <Sun className="h-4 w-4 opacity-0" />
+            ) : resolvedTheme === "dark" ? (
               <Sun className="h-4 w-4" />
             ) : (
               <Moon className="h-4 w-4" />

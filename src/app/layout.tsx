@@ -5,18 +5,14 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OmniSearch - The Ultimate Search Browser",
-  description: "AI-powered multi-source search aggregator with advanced filtering, summarization, and intelligence features.",
-  keywords: "search, AI, aggregator, browser, research, intelligence",
+  title: "Contact Intelligence | Spy-Grade OSINT",
+  description: "Hunt down contact information with spy-grade precision",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
-  ],
+  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0a0a0f" }],
 };
 
 export default function RootLayout({
@@ -25,14 +21,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="dark">
       <body
-        className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}
+        className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased bg-[#0a0a0f]`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange={false}
         >
           {children}

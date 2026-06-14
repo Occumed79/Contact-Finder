@@ -1,4 +1,15 @@
 import * as cheerio from 'cheerio'
+import {
+  type IntelligenceObject,
+  type ExpandedQuery,
+  type Vertical,
+  expandQuery,
+  scoreSignals,
+  calculateConfidence,
+  buildIntelligenceObject,
+  generateMockIntelligence,
+  VERTICAL_CONFIGS,
+} from './intelligence'
 
 export interface ContactResult {
   id: string
@@ -16,6 +27,9 @@ export interface SearchResult {
   sources: string[]
   timestamp: string
 }
+
+// Re-export intelligence types for consumers
+export type { IntelligenceObject, ExpandedQuery, Vertical }
 
 export function extractEmails(text: string): string[] {
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
@@ -81,28 +95,27 @@ async function fetchWithTimeout(url: string, timeout = 8000): Promise<Response> 
 }
 
 export async function searchDuckDuckGo(query: string): Promise<string> {
-  const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' contact phone email')}`
+  const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
   const res = await fetchWithTimeout(searchUrl)
   if (!res.ok) throw new Error(`DuckDuckGo error: ${res.status}`)
 
   const html = await res.text()
   const $ = cheerio.load(html)
 
-  // DuckDuckGo HTML results: .result__snippet contains snippets
   const snippets: string[] = []
   $('.result__snippet').each((_, el) => {
     snippets.push($(el).text())
   })
-  // Also grab titles and URLs
   $('.result__a').each((_, el) => {
     snippets.push($(el).text())
+    snippets.push($(el).attr('href') || '')
   })
 
   return snippets.join(' ')
 }
 
 export async function searchBingHTML(query: string): Promise<string> {
-  const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query + ' contact phone email')}&count=20`
+  const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=20`
   const res = await fetchWithTimeout(searchUrl)
   if (!res.ok) throw new Error(`Bing error: ${res.status}`)
 
@@ -110,7 +123,6 @@ export async function searchBingHTML(query: string): Promise<string> {
   const $ = cheerio.load(html)
 
   const snippets: string[] = []
-  // Bing result snippets
   $('.b_caption p, .b_algo p, li.b_algo .b_paractl').each((_, el) => {
     snippets.push($(el).text())
   })
@@ -123,7 +135,7 @@ export async function searchBingHTML(query: string): Promise<string> {
 }
 
 export async function searchGoogleScrape(query: string): Promise<string> {
-  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query + ' contact phone email')}&num=10&hl=en`
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10&hl=en`
   const res = await fetchWithTimeout(searchUrl)
   if (!res.ok) throw new Error(`Google error: ${res.status}`)
 
@@ -131,7 +143,6 @@ export async function searchGoogleScrape(query: string): Promise<string> {
   const $ = cheerio.load(html)
 
   const snippets: string[] = []
-  // Common Google selectors
   $('div[data-sokoban-container] span, .VwiC3b, .s3v94d, .g span, .g .VwiC3b').each((_, el) => {
     snippets.push($(el).text())
   })
@@ -156,9 +167,12 @@ export async function scrapeWebsiteForContacts(url: string): Promise<string> {
   }
 }
 
-export async function searchAllEngines(query: string): Promise<{ text: string; sources: string[] }> {
+export async function searchAllEngines(
+  queries: string[]
+): Promise<{ text: string; sources: string[]; rawTexts: string[] }> {
   const results: string[] = []
   const sources: string[] = []
+  const rawTexts: string[] = []
 
   const engines = [
     { name: 'DuckDuckGo', fn: searchDuckDuckGo },
@@ -166,15 +180,18 @@ export async function searchAllEngines(query: string): Promise<{ text: string; s
     { name: 'Google', fn: searchGoogleScrape },
   ]
 
-  for (const engine of engines) {
-    try {
-      const text = await engine.fn(query)
-      if (text.trim().length > 50) {
-        results.push(text)
-        sources.push(engine.name)
+  for (const query of queries) {
+    for (const engine of engines) {
+      try {
+        const text = await engine.fn(query)
+        if (text.trim().length > 50) {
+          results.push(text)
+          rawTexts.push(text)
+          sources.push(`${engine.name} (${query.slice(0, 40)})`)
+        }
+      } catch (err) {
+        console.warn(`${engine.name} failed for "${query}":`, err)
       }
-    } catch (err) {
-      console.warn(`${engine.name} failed:`, err)
     }
   }
 
@@ -186,6 +203,7 @@ export async function searchAllEngines(query: string): Promise<{ text: string; s
       const siteText = await scrapeWebsiteForContacts(foundUrls[0])
       if (siteText.length > 100) {
         results.push(siteText)
+        rawTexts.push(siteText)
         sources.push(`Direct: ${new URL(foundUrls[0]).hostname}`)
       }
     } catch {
@@ -193,11 +211,10 @@ export async function searchAllEngines(query: string): Promise<{ text: string; s
     }
   }
 
-  return { text: results.join(' '), sources }
+  return { text: results.join(' '), sources, rawTexts }
 }
 
-export function buildResultsFromText(query: string, text: string, sources: string[]): SearchResult {
-  const slug = query.toLowerCase().replace(/\s+/g, '')
+function buildContactsFromText(text: string, sources: string[]): ContactResult[] {
   const contacts: ContactResult[] = []
   let id = 1
 
@@ -206,11 +223,6 @@ export function buildResultsFromText(query: string, text: string, sources: strin
   const linkedins = [...new Set(extractLinkedIn(text))]
   const websites = [...new Set(extractWebsites(text))]
   const faxes = [...new Set(extractFax(text))]
-
-  // Add website from top result if none found
-  if (websites.length === 0) {
-    websites.push(`https://www.${slug}.com`)
-  }
 
   emails.forEach((email, i) => {
     contacts.push({
@@ -267,7 +279,25 @@ export function buildResultsFromText(query: string, text: string, sources: strin
     })
   })
 
-  // If no contacts found at all, fall back to mock
+  return contacts
+}
+
+export function buildResultsFromText(query: string, text: string, sources: string[]): SearchResult {
+  const slug = query.toLowerCase().replace(/\s+/g, '')
+  const contacts = buildContactsFromText(text, sources)
+
+  // Add website from top result if none found
+  if (contacts.filter(c => c.type === 'website').length === 0) {
+    contacts.push({
+      id: String(contacts.length + 1),
+      type: 'website',
+      value: `https://www.${slug}.com`,
+      label: 'Official Website',
+      source: 'DNS/Web Search',
+      confidence: 50,
+    })
+  }
+
   if (contacts.length === 0) {
     return generateMockResults(query)
   }
@@ -279,6 +309,44 @@ export function buildResultsFromText(query: string, text: string, sources: strin
     sources,
     timestamp: new Date().toISOString(),
   }
+}
+
+// ─── INTELLIGENCE-POWERED SEARCH ───
+
+export async function searchIntelligence(
+  query: string,
+  forcedVertical?: Vertical
+): Promise<IntelligenceObject> {
+  const expanded = expandQuery(query, forcedVertical)
+  const vertical = expanded.vertical
+
+  // Build all queries to search: original + expansions + operator variants
+  const allQueries = [
+    query,
+    ...expanded.expansions.slice(0, 6), // limit to prevent rate limits
+    ...expanded.withOperators.slice(0, 3),
+  ]
+
+  const { text, sources, rawTexts } = await searchAllEngines(allQueries)
+
+  const contacts = buildContactsFromText(text, sources)
+
+  // Apply vertical-specific scoring rules
+  const config = VERTICAL_CONFIGS[vertical]
+  for (const contact of contacts) {
+    for (const rule of config.scoringRules) {
+      if (rule.pattern.test(contact.value) || rule.pattern.test(contact.source)) {
+        contact.confidence = Math.min(100, contact.confidence + rule.score)
+      }
+    }
+  }
+
+  // If no contacts found, fall back to mock intelligence
+  if (contacts.length === 0 || text.trim().length < 100) {
+    return generateMockIntelligence(query, vertical)
+  }
+
+  return buildIntelligenceObject(query, expanded, contacts, sources, rawTexts)
 }
 
 export function generateMockResults(query: string): SearchResult {
