@@ -34,7 +34,15 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'PostgreSQL pgvector extension for persistent vector storage and similarity search',
     status: 'active',
     runtimeEnabled: true,
-    notes: 'Implemented with pg library. Requires DATABASE_URL and PostgreSQL with pgvector extension. Call initialize() to set up schema.',
+    notes: 'Implemented with pg library. Requires DATABASE_URL and PostgreSQL with pgvector extension. Automatic schema initialization on first use.',
+  },
+  {
+    id: 'embedding_model',
+    label: 'Local Embedding Model',
+    description: 'Local sentence transformer model for generating text embeddings',
+    status: 'active',
+    runtimeEnabled: true,
+    notes: 'Implemented with @xenova/transformers using Xenova/all-MiniLM-L6-v2 model. Runs entirely in-browser/server-side without API keys.',
   },
   {
     id: 'document_text_extraction',
