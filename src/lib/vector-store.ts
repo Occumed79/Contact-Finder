@@ -124,6 +124,8 @@ export class LocalVectorStoreAdapter implements VectorStoreAdapter {
 }
 
 // ─── PGVECTOR STORE ADAPTER ───
+// SERVER-SIDE ONLY: This module must only be imported in server-side code (API routes, server components)
+// Do not import this in client components or it will bundle heavy dependencies.
 
 import { Pool, PoolClient } from 'pg'
 

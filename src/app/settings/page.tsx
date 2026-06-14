@@ -299,29 +299,26 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">DATABASE_URL</label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  PostgreSQL connection string for pgvector integration. Leave empty to use local in-memory vector store only.
+                <p className="text-sm font-medium mb-2">DATABASE_URL (Server-Side Only)</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  PostgreSQL connection string for pgvector integration. This must be configured as an environment variable on your deployment platform (e.g., Render, Vercel). The browser never sees the raw connection string.
                 </p>
-                <input
-                  type="password"
-                  placeholder="postgresql://user:password@host:port/database"
-                  className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-                  defaultValue={typeof window !== 'undefined' ? (window as any).DATABASE_URL || '' : ''}
-                  onChange={(e) => {
-                    // This would need to be stored in environment variables or a secure storage
-                    // For now, this is a placeholder for the UI
-                    console.log('DATABASE_URL changed:', e.target.value)
-                  }}
-                />
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Configuration:</strong> Set <code className="bg-background px-1 py-0.5 rounded text-xs">DATABASE_URL</code> in your deployment environment variables.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    <strong>Example:</strong> <code className="bg-background px-1 py-0.5 rounded text-xs">postgresql://user:password@host:port/database</code>
+                  </p>
+                </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Set this as an environment variable on your deployment platform (e.g., Render, Vercel).
+                  If DATABASE_URL is not configured, the app uses local in-memory vector storage only.
                 </p>
               </div>
               <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">pgvector Status</p>
+                <p className="text-sm font-medium mb-2">pgvector Capabilities</p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  When DATABASE_URL is configured, the app will automatically initialize the pgvector extension and schema on first use.
+                  When DATABASE_URL is configured, the app automatically initializes the pgvector extension and schema on first use.
                 </p>
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   <div className="flex items-center gap-2">

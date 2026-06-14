@@ -4,6 +4,8 @@ import Tesseract from 'tesseract.js'
 import mammoth from 'mammoth'
 
 // ─── DOCUMENT EXTRACTION LAYER ───
+// SERVER-SIDE ONLY: This module must only be imported in server-side code (API routes, server components)
+// Do not import this in client components or it will bundle heavy dependencies.
 
 export interface ExtractedDocument {
   text: string
@@ -238,9 +240,17 @@ export function extractFromPDFText(pdfText: string, metadata?: any): ExtractedDo
 /**
  * Extract from DOCX using mammoth (binary parsing)
  */
-export async function extractFromDOCXBuffer(buffer: Buffer): Promise<ExtractionResult> {
+export async function extractFromDOCXBuffer(buffer: Buffer, timeout = 10000): Promise<ExtractionResult> {
   try {
-    const result = await mammoth.extractRawText({ buffer })
+    // Add timeout for DOCX parsing
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('DOCX parsing timeout')), timeout)
+    )
+    
+    const result = await Promise.race([
+      mammoth.extractRawText({ buffer }),
+      timeoutPromise,
+    ])
     const text = result.value.replace(/\s+/g, ' ').trim()
     
     if (text.length < 10) {
@@ -338,9 +348,26 @@ export function extractFromDOCXText(docxContent: string): ExtractedDocument {
 }
 
 /**
+ * Check if OCR is enabled via environment variable
+ */
+export function isOCREnabled(): boolean {
+  return process.env.ENABLE_OCR === 'true'
+}
+
+/**
  * Extract text from image using OCR (Tesseract.js)
+ * Only runs if ENABLE_OCR=true env var is set
  */
 export async function extractFromImage(imageBuffer: Buffer, timeout = 30000): Promise<ExtractionResult> {
+  // Check if OCR is enabled
+  if (!isOCREnabled()) {
+    console.log('OCR disabled via ENABLE_OCR env var, skipping image extraction')
+    return {
+      success: false,
+      error: 'OCR is disabled. Set ENABLE_OCR=true to enable.',
+    }
+  }
+  
   try {
     const worker = await Tesseract.createWorker('eng', 1, {
       logger: (m: any) => {
@@ -350,7 +377,15 @@ export async function extractFromImage(imageBuffer: Buffer, timeout = 30000): Pr
       },
     })
     
-    const result = await worker.recognize(imageBuffer)
+    // Add timeout for OCR operation
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('OCR operation timeout')), timeout)
+    )
+    
+    const result = await Promise.race([
+      worker.recognize(imageBuffer),
+      timeoutPromise,
+    ])
     await worker.terminate()
     
     const text = result.data.text.replace(/\s+/g, ' ').trim()

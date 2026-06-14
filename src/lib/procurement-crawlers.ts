@@ -2,6 +2,8 @@ import * as cheerio from 'cheerio'
 import type { ScrapedResult } from '../types/search'
 
 // ─── SPECIALIZED PROCUREMENT CRAWLERS ───
+// SERVER-SIDE ONLY: This module must only be imported in server-side code (API routes, server components)
+// Do not import this in client components or it will bundle heavy dependencies.
 
 export type CrawlerStatus = 'success' | 'timeout' | 'blocked' | 'error' | 'empty'
 

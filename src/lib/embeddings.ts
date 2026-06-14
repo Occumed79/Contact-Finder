@@ -1,16 +1,28 @@
 // ─── EMBEDDING SERVICE (Local with @xenova/transformers) ───
-
-import { pipeline } from '@xenova/transformers'
+// SERVER-SIDE ONLY: This module must only be imported in server-side code (API routes, server components)
+// Do not import this in client components or it will bundle heavy dependencies.
 
 let embeddingPipeline: any = null
 let isInitializing = false
 
 /**
- * Initialize the embedding pipeline (lazy loading)
+ * Check if local embeddings are enabled via environment variable
+ */
+export function isLocalEmbeddingsEnabled(): boolean {
+  return process.env.ENABLE_LOCAL_EMBEDDINGS === 'true'
+}
+
+/**
+ * Initialize the embedding pipeline (lazy loading with timeout)
  * Uses a lightweight sentence transformer model
  */
 export async function initializeEmbeddings(): Promise<void> {
   if (embeddingPipeline !== null) {
+    return
+  }
+  
+  if (!isLocalEmbeddingsEnabled()) {
+    console.log('Local embeddings disabled via ENABLE_LOCAL_EMBEDDINGS env var')
     return
   }
   
@@ -25,13 +37,26 @@ export async function initializeEmbeddings(): Promise<void> {
   isInitializing = true
   
   try {
+    // Dynamic import to avoid bundling heavy dependencies
+    const { pipeline } = await import('@xenova/transformers')
+    
+    // Add timeout for model loading (60 seconds)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Embedding model initialization timeout')), 60000)
+    )
+    
     // Use a lightweight sentence transformer model
     // 'Xenova/all-MiniLM-L6-v2' is a good balance of speed and quality
-    embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2')
+    embeddingPipeline = await Promise.race([
+      pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2'),
+      timeoutPromise,
+    ])
+    
     console.log('Embedding pipeline initialized with Xenova/all-MiniLM-L6-v2')
   } catch (err) {
-    console.error('Failed to initialize embedding pipeline:', err)
-    throw err
+    console.error('Failed to initialize embedding pipeline, falling back to hash-based embeddings:', err)
+    embeddingPipeline = null
+    // Don't throw - allow fallback to hash-based embeddings
   } finally {
     isInitializing = false
   }
@@ -39,14 +64,24 @@ export async function initializeEmbeddings(): Promise<void> {
 
 /**
  * Generate embedding for a single text
+ * Falls back to hash-based pseudo-embedding if model fails
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  // Check if local embeddings are enabled
+  if (!isLocalEmbeddingsEnabled()) {
+    console.log('Local embeddings disabled, using hash-based fallback')
+    return generateHashEmbedding(text)
+  }
+  
+  // Try to initialize if not already done
   if (!embeddingPipeline) {
     await initializeEmbeddings()
   }
   
+  // If pipeline is still not available, use fallback
   if (!embeddingPipeline) {
-    throw new Error('Embedding pipeline not available')
+    console.log('Embedding pipeline not available, using hash-based fallback')
+    return generateHashEmbedding(text)
   }
   
   try {
@@ -59,9 +94,39 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     const embedding = Array.from(output.data) as number[]
     return embedding
   } catch (err) {
-    console.error('Failed to generate embedding:', err)
-    throw err
+    console.error('Failed to generate embedding, using hash-based fallback:', err)
+    return generateHashEmbedding(text)
   }
+}
+
+/**
+ * Generate hash-based pseudo-embedding (fallback)
+ * This is a lightweight alternative that doesn't require external models
+ */
+function generateHashEmbedding(text: string): number[] {
+  const embedding = new Float32Array(128)
+  const normalizedText = text.toLowerCase().replace(/\s+/g, ' ')
+  
+  // Simple hash-based embedding generation
+  for (let i = 0; i < 128; i++) {
+    let hash = 0
+    for (let j = 0; j < normalizedText.length; j++) {
+      const char = normalizedText.charCodeAt(j)
+      hash = ((hash << 5) - hash) + char + (i * char)
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    embedding[i] = (hash % 1000) / 1000 // Normalize to [-1, 1]
+  }
+  
+  // Normalize the vector
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0))
+  if (magnitude > 0) {
+    for (let i = 0; i < 128; i++) {
+      embedding[i] /= magnitude
+    }
+  }
+  
+  return Array.from(embedding)
 }
 
 /**
