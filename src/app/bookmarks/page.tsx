@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { Bookmark, X, Search, ExternalLink, Folder, Tag } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Header } from "@/components/header";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import { BookmarkItem } from "@/types/search";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { Header } from "../../components/header";
+import { useLocalStorage } from "../../hooks/use-local-storage";
+import { BookmarkItem } from "../../types/search";
 
 export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useLocalStorage<BookmarkItem[]>("bookmarks-list", []);
