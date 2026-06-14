@@ -90,9 +90,11 @@ async function checkPgvector(): Promise<void> {
     console.log('Inserting test vector...')
     const testId = 'test-vector-' + Date.now()
     const testVector = Array.from({ length: 1536 }, () => Math.random())
+    // Format vector as string for pgvector
+    const vectorString = `[${testVector.map(v => v.toFixed(6)).join(',')}]`
     await client.query(
       'INSERT INTO documents (id, text, embedding) VALUES ($1, $2, $3)',
-      [testId, 'Test document for pgvector verification', testVector]
+      [testId, 'Test document for pgvector verification', vectorString]
     )
     console.log('✓ Test vector inserted\n')
 
@@ -117,7 +119,7 @@ async function checkPgvector(): Promise<void> {
       FROM documents
       WHERE id = $2
       `,
-      [testVector, testId]
+      [vectorString, testId]
     )
     if (similarityResult.rows.length === 1) {
       const similarity = similarityResult.rows[0].similarity
