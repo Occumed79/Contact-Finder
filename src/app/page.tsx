@@ -1,63 +1,35 @@
 "use client";
 
-import {
-  Activity,
-  ArrowUpDown,
-  BookOpen,
-  Bookmark,
-  Briefcase,
-  Building2,
-  Code,
-  Command,
-  Database,
-  Download,
-  ExternalLink,
-  FileText,
-  Filter,
-  GraduationCap,
-  History,
-  Loader2,
-  Newspaper,
-  Search,
-  Settings,
-  Sparkles,
-  Stethoscope,
-  Zap,
-  Scale,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { BookOpen, Command, ExternalLink, Loader2, Search } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { useSearch } from "../hooks/use-search";
 import type { SearchLens, ScrapedResult } from "../types/search";
 
-const LENSES: { id: SearchLens; label: string; icon: LucideIcon }[] = [
-  { id: "web", label: "Web", icon: Search },
-  { id: "pdf", label: "PDF", icon: FileText },
-  { id: "government", label: "Gov", icon: Building2 },
-  { id: "procurement", label: "RFP", icon: Database },
-  { id: "pricing", label: "Pricing", icon: Zap },
-  { id: "provider", label: "Provider", icon: Stethoscope },
-  { id: "technical", label: "Tech", icon: Code },
-  { id: "news", label: "News", icon: Newspaper },
-  { id: "legal", label: "Legal", icon: Scale },
-  { id: "medical", label: "Medical", icon: Stethoscope },
-  { id: "academic", label: "Academic", icon: GraduationCap },
-  { id: "financial", label: "Financial", icon: Briefcase },
+const LENSES: { id: SearchLens; label: string }[] = [
+  { id: "web", label: "Web" },
+  { id: "pdf", label: "PDF" },
+  { id: "government", label: "Gov" },
+  { id: "procurement", label: "RFP" },
+  { id: "pricing", label: "Pricing" },
+  { id: "provider", label: "Provider" },
+  { id: "technical", label: "Tech" },
+  { id: "news", label: "News" },
+  { id: "legal", label: "Legal" },
+  { id: "medical", label: "Medical" },
+  { id: "academic", label: "Academic" },
+  { id: "financial", label: "Financial" },
 ];
 
 const FEATURE_CARDS = [
   {
-    icon: Activity,
     title: "Multi-engine search",
     text: "DuckDuckGo, Bing, Google, and optional backbones in one ranked stream.",
   },
   {
-    icon: Sparkles,
     title: "Query intelligence",
     text: "Lens-aware expansion for RFPs, providers, pricing, PDFs, and technical searches.",
   },
   {
-    icon: ArrowUpDown,
     title: "Signal scoring",
     text: "Boosts useful sources, government portals, documents, and structured matches.",
   },
@@ -75,8 +47,8 @@ function ResultCard({ result, index }: { result: ScrapedResult; index: number })
   const score = Number.isFinite(result.score) ? Math.round(result.score) : 0;
 
   return (
-    <article className="liquid-result-card liquid-glass">
-      <div className="result-topline">
+    <article className="result-card liquid-glass">
+      <div className="result-meta-row">
         <span className="result-rank">#{index + 1}</span>
         <span className={sourceClass(result.source)}>{result.source}</span>
         {result.resultType && <span className="result-type">{result.resultType}</span>}
@@ -86,7 +58,7 @@ function ResultCard({ result, index }: { result: ScrapedResult; index: number })
       <h3 className="result-title">
         <a href={result.url} target="_blank" rel="noreferrer">
           {result.title || result.domain || result.url}
-          <ExternalLink className="result-external" aria-hidden="true" />
+          <ExternalLink className="external-icon" aria-hidden="true" />
         </a>
       </h3>
 
@@ -140,20 +112,13 @@ export default function Home() {
   }
 
   function exportResults(format: "json" | "csv") {
-    const safeQuery = (query || "search")
-      .replace(/[^a-zA-Z0-9-]/g, "_")
-      .substring(0, 50);
+    const safeQuery = (query || "search").replace(/[^a-zA-Z0-9-]/g, "_").substring(0, 50);
     const timestamp = new Date().toISOString();
 
     if (format === "json") {
       const data = JSON.stringify(
         {
-          metadata: {
-            query,
-            lens,
-            timestamp,
-            resultCount: filteredResults.length,
-          },
+          metadata: { query, lens, timestamp, resultCount: filteredResults.length },
           intelligence,
           results: filteredResults,
         },
@@ -190,82 +155,62 @@ export default function Home() {
   }
 
   return (
-    <main className="ultra-liquid-page">
-      <div className="liquid-aurora" aria-hidden="true" />
-      <div className="liquid-grid" aria-hidden="true" />
-      <div className="liquid-orb orb-one" aria-hidden="true" />
-      <div className="liquid-orb orb-two" aria-hidden="true" />
-      <div className="liquid-sweep" aria-hidden="true" />
+    <main className="ultra-page">
+      <div className="ambient ambient-one" aria-hidden="true" />
+      <div className="ambient ambient-two" aria-hidden="true" />
+      <div className="ambient-sweep" aria-hidden="true" />
 
-      <section className="liquid-shell">
-        <header className="liquid-topbar liquid-glass">
-          <a className="liquid-brand" href="/" aria-label="UltraSearch home">
-            <span className="brand-mark">
-              <Search className="brand-search" aria-hidden="true" />
-              <Zap className="brand-zap" aria-hidden="true" />
-            </span>
-            <span><strong>Ultra</strong>Search</span>
+      <section className="app-shell">
+        <header className="topbar liquid-glass">
+          <a className="brand" href="/" aria-label="Ultra Search home">
+            <span className="brand-icon"><Search aria-hidden="true" /></span>
+            <span>Ultra Search</span>
           </a>
 
-          <nav className="liquid-nav" aria-label="App navigation">
-            <a href="/history"><History aria-hidden="true" />History</a>
-            <a href="/bookmarks"><Bookmark aria-hidden="true" />Bookmarks</a>
-            <a href="/settings"><Settings aria-hidden="true" />Settings</a>
+          <nav className="top-nav" aria-label="App navigation">
+            <a href="/history">History</a>
+            <a href="/bookmarks">Bookmarks</a>
+            <a href="/settings">Settings</a>
           </nav>
         </header>
 
-        <section className="app-workspace liquid-glass">
-          <div className="workspace-header">
-            <div>
-              <p className="eyebrow"><span /> Live browser intelligence</p>
-              <h1>Ultra Search</h1>
-              <p className="hero-copy">
-                Search RFPs, providers, pricing, documents, and web results from one clean glass workspace.
-              </p>
-            </div>
-            <div className="workspace-status" aria-label="Runtime status">
-              <span className="status-dot" />
-              No API keys required
-            </div>
+        <section className="search-workspace liquid-glass">
+          <div className="workspace-heading">
+            <p className="status-pill"><span /> Search browser</p>
+            <h1>What are you looking for?</h1>
+            <p>Search the web, RFPs, providers, pricing, PDFs, technical docs, and more.</p>
           </div>
 
-          <div className="lens-ribbon" aria-label="Search lenses">
-            {LENSES.map((item) => {
-              const Icon = item.icon;
-              const active = lens === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setLens(item.id)}
-                  className={active ? "lens-chip active" : "lens-chip"}
-                >
-                  <Icon aria-hidden="true" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <form className="search-composer" onSubmit={submitSearch}>
-            <Search className="composer-icon" aria-hidden="true" />
+          <form className="search-bar" onSubmit={submitSearch}>
+            <Search className="search-icon" aria-hidden="true" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search RFPs, providers, pricing, PDFs, technical docs..."
+              placeholder="Search anything..."
               aria-label="Search query"
+              autoFocus
             />
-            <div className="composer-actions">
-              <kbd><Command aria-hidden="true" />K</kbd>
-              <button type="submit" disabled={isLoading || !query.trim()}>
-                {isLoading ? <Loader2 className="spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
-                {isLoading ? "Searching" : "Search"}
-              </button>
-            </div>
+            <kbd><Command aria-hidden="true" />K</kbd>
+            <button type="submit" disabled={isLoading || !query.trim()}>
+              {isLoading ? <Loader2 className="spin" aria-hidden="true" /> : "Search"}
+            </button>
           </form>
 
+          <div className="lens-row" aria-label="Search lenses">
+            {LENSES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setLens(item.id)}
+                className={lens === item.id ? "lens-pill active" : "lens-pill"}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
           {suggestions.length > 0 && query && !hasSearched && (
-            <div className="suggestion-row">
+            <div className="suggestions">
               {suggestions.slice(0, 4).map((suggestion) => (
                 <button type="button" key={suggestion.text} onClick={() => setQuery(suggestion.text)}>
                   {suggestion.text}
@@ -273,106 +218,84 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
 
-        {!hasSearched && (
-          <section className="feature-grid">
-            {FEATURE_CARDS.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <article key={feature.title} className="feature-card liquid-glass">
-                  <Icon aria-hidden="true" />
-                  <h2>{feature.title}</h2>
-                  <p>{feature.text}</p>
-                </article>
-              );
-            })}
-          </section>
-        )}
+          {hasSearched && (
+            <section className="results-zone inline-results">
+              <div className="results-toolbar">
+                <div>
+                  <strong>{filteredResults.length}</strong> results
+                  <span>{searchTime.toFixed(0)}ms · {lens}</span>
+                </div>
 
-        {hasSearched && (
-          <section className="results-zone">
-            <div className="results-toolbar liquid-glass">
-              <div>
-                <span className="results-count">{filteredResults.length}</span>
-                <span className="results-label">results</span>
-                <span className="results-meta">{searchTime.toFixed(0)}ms · {lens}</span>
-              </div>
-
-              <div className="toolbar-controls">
-                <label>
-                  <Filter aria-hidden="true" />
+                <div className="toolbar-controls">
                   <select value={filterSource} onChange={(event) => setFilterSource(event.target.value)}>
                     <option value="">All sources</option>
                     {sources.map((source) => <option value={source} key={source}>{source}</option>)}
                   </select>
-                </label>
 
-                <label>
-                  <ArrowUpDown aria-hidden="true" />
                   <select value={sortBy} onChange={(event) => setSortBy(event.target.value as "score" | "rank" | "source")}>
-                    <option value="score">Score</option>
-                    <option value="rank">Rank</option>
-                    <option value="source">Source</option>
+                    <option value="score">Sort: Score</option>
+                    <option value="rank">Sort: Rank</option>
+                    <option value="source">Sort: Source</option>
                   </select>
-                </label>
 
-                <button type="button" onClick={() => exportResults("json")}><Download aria-hidden="true" />JSON</button>
-                <button type="button" onClick={() => exportResults("csv")}><Download aria-hidden="true" />CSV</button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="error-panel liquid-glass">
-                <strong>Search failed</strong>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {intelligence && (
-              <article className="intel-panel liquid-glass">
-                <div className="intel-heading">
-                  <Sparkles aria-hidden="true" />
-                  <h2>Search intelligence</h2>
-                  <span>{intelligence.confidence}% confidence</span>
+                  <button type="button" onClick={() => exportResults("json")}>JSON</button>
+                  <button type="button" onClick={() => exportResults("csv")}>CSV</button>
                 </div>
-                <p>{intelligence.summary || `Results for “${intelligence.query}” using the ${intelligence.lens} lens.`}</p>
-
-                {intelligence.queryExpansions.length > 0 && (
-                  <div className="intel-chips">
-                    {intelligence.queryExpansions.slice(0, 8).map((expansion) => (
-                      <button type="button" key={expansion} onClick={() => setQuery(expansion)}>
-                        {expansion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {intelligence.signals.length > 0 && (
-                  <div className="signal-strip">
-                    {intelligence.signals.slice(0, 8).map((signal) => (
-                      <span key={`${signal.name}-${signal.score}`} title={signal.description}>
-                        {signal.name} {signal.score > 0 ? "+" : ""}{signal.score}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            )}
-
-            <div className="results-list">
-              {filteredResults.map((result, index) => (
-                <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
-              ))}
-            </div>
-
-            {!isLoading && filteredResults.length === 0 && !error && (
-              <div className="empty-panel liquid-glass">
-                <BookOpen aria-hidden="true" />
-                <h2>No results came back yet.</h2>
-                <p>Try a broader query or switch lenses.</p>
               </div>
-            )}
+
+              {error && (
+                <div className="error-panel">
+                  <strong>Search failed</strong>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {intelligence && (
+                <article className="intel-panel">
+                  <div className="intel-heading">
+                    <h2>Search intelligence</h2>
+                    <span>{intelligence.confidence}% confidence</span>
+                  </div>
+                  <p>{intelligence.summary || `Results for “${intelligence.query}” using the ${intelligence.lens} lens.`}</p>
+
+                  {intelligence.queryExpansions.length > 0 && (
+                    <div className="intel-chips">
+                      {intelligence.queryExpansions.slice(0, 8).map((expansion) => (
+                        <button type="button" key={expansion} onClick={() => setQuery(expansion)}>
+                          {expansion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              )}
+
+              <div className="results-list">
+                {filteredResults.map((result, index) => (
+                  <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
+                ))}
+              </div>
+
+              {!isLoading && filteredResults.length === 0 && !error && (
+                <div className="empty-panel">
+                  <BookOpen aria-hidden="true" />
+                  <h2>No results came back yet.</h2>
+                  <p>Try a broader query or switch lenses.</p>
+                </div>
+              )}
+            </section>
+          )}
+        </section>
+
+        {!hasSearched && (
+          <section className="feature-grid">
+            {FEATURE_CARDS.map((feature) => (
+              <article key={feature.title} className="feature-card liquid-glass">
+                <h2>{feature.title}</h2>
+                <p>{feature.text}</p>
+              </article>
+            ))}
           </section>
         )}
       </section>
