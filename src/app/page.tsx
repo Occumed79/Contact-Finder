@@ -1,666 +1,286 @@
-// @ts-nocheck
 "use client";
 
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, ExternalLink, Clock, Filter, X, Download, Sparkles, TrendingUp,
-  Calendar, DollarSign, MapPin, Phone, Mail, CheckCircle, AlertTriangle,
-  Clock as ClockIcon, Bookmark, Settings, Command, ChevronRight
+  Search, Phone, Mail, Printer, Linkedin, Globe,
+  Shield, Zap, Eye, Target, Radio, Database, Activity,
+  ChevronRight, Copy, ExternalLink, AlertTriangle,
+  CheckCircle2, Wifi, Crosshair, Radar as RadarIcon,
 } from "lucide-react";
-import { Badge } from "../components/ui/badge";
+import MatrixRain from "../components/MatrixRain";
+import Radar from "../components/Radar";
+import GlobeVis from "../components/Globe";
 import { useSearch } from "../hooks/use-search";
-import {
-  type SearchLens, type ScrapedResult,
-  type ProcurementIntelligence, type ProviderIntelligence, type PricingIntelligence,
-  type LegalIntelligence, type MedicalIntelligence, type AcademicIntelligence, type FinancialIntelligence
-} from "../types/search";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { type Vertical } from "../types/search";
 
-const LENSES = [
-  { id: "web", label: "Web" },
-  { id: "pdf", label: "PDF" },
-  { id: "government", label: "Gov" },
-  { id: "procurement", label: "RFP" },
-  { id: "pricing", label: "Pricing" },
-  { id: "provider", label: "Provider" },
-  { id: "technical", label: "Tech" },
-  { id: "news", label: "News" },
-  { id: "legal", label: "Legal" },
-  { id: "medical", label: "Medical" },
-  { id: "academic", label: "Academic" },
-  { id: "financial", label: "Financial" },
+const VERTICALS = [
+  { id: "contact", label: "CONTACT", icon: Phone, color: "text-spy-cyan" },
+  { id: "procurement", label: "PROCUREMENT", icon: Target, color: "text-spy-green" },
+  { id: "provider", label: "PROVIDER", icon: Database, color: "text-spy-purple" },
+  { id: "pricing", label: "PRICING", icon: Activity, color: "text-spy-amber" },
+  { id: "general", label: "GENERAL", icon: Zap, color: "text-slate-400" },
 ];
 
-const SOURCE_COLORS = {
-  Google: "bg-blue-500/10 text-blue-300 border-blue-500/30",
-  Bing: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-  DuckDuckGo: "bg-orange-500/10 text-orange-300 border-orange-500/30",
-};
-
-function OccuMedLogo({ className = "" }) {
-  return (
-    <svg viewBox="0 0 200 60" className={className} fill="none">
-      <defs>
-        <linearGradient id="logoGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(220,235,255,0.95)" />
-          <stop offset="100%" stopColor="rgba(180,210,240,0.7)" />
-        </linearGradient>
-        <filter id="logoGlow">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      <path d="M8 48 L8 12 C8 8 14 8 16 12 L24 36 L32 12 C34 8 40 8 40 12 L40 48"
-            stroke="url(#logoGrad)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"
-            fill="none" filter="url(#logoGlow)" />
-      <text x="52" y="38" fill="url(#logoGrad)" fontSize="22" fontWeight="600"
-            fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
-            letterSpacing="1.5" filter="url(#logoGlow)">
-        OCCU-MED
-      </text>
-    </svg>
-  );
+function ContactTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case "phone": return <Phone className="w-4 h-4 text-spy-green" />;
+    case "email": return <Mail className="w-4 h-4 text-spy-cyan" />;
+    case "fax": return <Printer className="w-4 h-4 text-spy-amber" />;
+    case "linkedin": return <Linkedin className="w-4 h-4 text-blue-400" />;
+    case "website": return <Globe className="w-4 h-4 text-spy-purple" />;
+    default: return <Globe className="w-4 h-4 text-slate-400" />;
+  }
 }
 
 export default function Home() {
   const {
-    query, setQuery, lens, setLens,
-    intelligence, scrapedResults, isLoading, error, suggestions,
-    hasSearched, searchTime, performSearch,
+    query, setQuery, vertical, setVertical,
+    intelligence, isLoading, error,
+    hasSearched, performSearch,
   } = useSearch();
 
-  const [sortBy, setSortBy] = useState('score');
-  const [filterSource, setFilterSource] = useState(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [lensOpen, setLensOpen] = useState(false);
-  const searchInputRef = useRef(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [showMatrix, setShowMatrix] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  const addLog = (message: string) => {
+    setLogs((prev) => [...prev.slice(-20), `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
 
-  const sources = useMemo(() => {
-    const uniqueSources = new Set(scrapedResults.map(r => r.source));
-    return Array.from(uniqueSources);
-  }, [scrapedResults]);
+  const copyToClipboard = async (value: string, id: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
-  const filteredResults = useMemo(() => {
-    let results = [...scrapedResults];
-    if (filterSource) results = results.filter(r => r.source === filterSource);
-    results.sort((a, b) => {
-      if (sortBy === 'score') return b.score - a.score;
-      if (sortBy === 'rank') return a.rank - b.rank;
-      if (sortBy === 'source') return a.source.localeCompare(b.source);
-      return 0;
-    });
-    return results;
-  }, [scrapedResults, sortBy, filterSource]);
-
-  const exportResults = (format) => {
-    const safeQuery = query.replace(/[^a-zA-Z0-9-]/g, '_').substring(0, 50);
-    const timestamp = new Date().toISOString();
-    if (format === 'json') {
-      const data = JSON.stringify({
-        metadata: { query, lens, timestamp, resultCount: filteredResults.length },
-        results: filteredResults,
-      }, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'search-results-' + safeQuery + '-' + timestamp + '.json';
-      a.click(); URL.revokeObjectURL(url);
-    } else if (format === 'csv') {
-      const headers = ['Title', 'URL', 'Description', 'Source', 'Score', 'Rank'];
-      const rows = filteredResults.map(r => [
-        '"' + (r.title || '').replace(/"/g, '""') + '"',
-        '"' + r.url + '"', '"' + (r.description || '').replace(/"/g, '""') + '"',
-        '"' + r.source + '"', String(r.score ?? 0), String(r.rank ?? 0),
-      ]);
-      const csv = ['"Metadata","Query: ' + query + '","Lens: ' + lens + '","Timestamp: ' + timestamp + '","Results: ' + filteredResults.length + '"',
-        headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'search-results-' + safeQuery + '-' + timestamp + '.csv';
-      a.click(); URL.revokeObjectURL(url);
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setLogs([]);
+    addLog(`Vertical: ${vertical.toUpperCase()}`);
+    addLog("Expanding query semantics...");
+    await performSearch();
+    if (intelligence) {
+      addLog(`INTELLIGENCE ACQUIRED: ${intelligence.contacts?.length || 0} vectors | Confidence: ${intelligence.confidence}%`);
     }
   };
 
-  return (
-    <div className="min-h-screen relative">
-      <div className="liquid-bg">
-        <div className="aurora-1" />
-        <div className="aurora-2" />
-        <div className="aurora-3" />
-        <div className="glass-bubble bubble-1" />
-        <div className="glass-bubble bubble-2" />
-        <div className="glass-bubble bubble-3" />
-      </div>
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
-      <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <a href="/" className="logo-glow">
-          <OccuMedLogo className="h-9 w-auto" />
-        </a>
-        <div className="flex items-center gap-2">
-          <button className="glass-button" onClick={() => window.location.href='/history'}>
-            <ClockIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">History</span>
-          </button>
-          <button className="glass-button" onClick={() => window.location.href='/bookmarks'}>
-            <Bookmark className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Bookmarks</span>
-          </button>
-          <button className="glass-button" onClick={() => window.location.href='/settings'}>
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Settings</span>
-          </button>
+  return (
+    <div className="min-h-screen bg-spy-black spy-grid-bg relative overflow-hidden">
+      {showMatrix && <MatrixRain />}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-spy-cyan/5 rounded-full blur-3xl pointer-events-none z-10" />
+      <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-spy-purple/5 rounded-full blur-3xl pointer-events-none z-10" />
+
+      {isLoading && (
+        <div className="fixed inset-0 pointer-events-none z-50">
+          <div className="scan-line" />
+        </div>
+      )}
+
+      <header className="relative z-20 border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Shield className="w-8 h-8 text-spy-cyan glow-cyan" />
+            <div>
+              <h1 className="text-lg font-bold tracking-wider text-white spy-text">
+                CONTACT<span className="text-spy-cyan">INTEL</span>
+              </h1>
+              <div className="flex items-center gap-2">
+                <Radio className="w-3 h-3 text-spy-green data-pulse" />
+                <span className="text-[10px] spy-text text-spy-green tracking-widest">SYSTEM ACTIVE</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setShowMatrix(!showMatrix)} className="glass-panel px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors flex items-center gap-2">
+              <Wifi className="w-3.5 h-3.5 text-spy-cyan" />
+              <span className="spy-text text-[10px] text-white/70">MATRIX: {showMatrix ? "ON" : "OFF"}</span>
+            </button>
+            <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-full">
+              <Database className="w-3.5 h-3.5 text-spy-purple" />
+              <span className="spy-text text-[10px] text-white/70">OSINT DATABASE</span>
+            </div>
+            <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-full">
+              <Eye className="w-3.5 h-3.5 text-spy-cyan" />
+              <span className="spy-text text-[10px] text-white/70">STEALTH MODE</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-col items-center px-4"
-            style={{ marginTop: hasSearched ? '16px' : '12vh' }}>
-
-        <div className="w-full max-w-2xl">
-          <div className="search-pill flex items-center gap-3 px-5 py-3">
-            <Search className="w-5 h-5 text-white/40 flex-shrink-0" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search anything..."
-              className="flex-1 bg-transparent border-none outline-none text-[15px] text-white/90 placeholder:text-white/35"
-              onKeyDown={(e) => { if (e.key === 'Enter') performSearch(); }}
-            />
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-[11px] text-white/40 font-mono">
-                <Command className="w-3 h-3" />K
-              </kbd>
-              <button onClick={performSearch} disabled={isLoading} className="search-btn-glow">
-                {isLoading ? 'Searching...' : 'Search'}
-              </button>
+      <main className="relative z-20 max-w-7xl mx-auto px-6 py-8">
+        <div className="flex justify-center gap-8 mb-8">
+          <div className="glass-panel rounded-2xl p-4 flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-2">
+              <RadarIcon className="w-4 h-4 text-spy-green" />
+              <span className="spy-text text-[10px] tracking-widest text-spy-green">SIGNAL DETECTION</span>
             </div>
+            <Radar />
           </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <div className="relative">
-              <button
-                onClick={() => setLensOpen(!lensOpen)}
-                className={'w-10 h-10 rounded-full flex items-center justify-center transition-all ' +
-                  (lensOpen
-                    ? 'bg-white/10 border border-white/20 text-white/90'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:text-white/80')
-                }
-                title="Search lenses"
-              >
-                <ChevronRight className={'w-4 h-4 transition-transform ' + (lensOpen ? 'rotate-90' : '')} />
-              </button>
-              {lensOpen && (
-                <div className="absolute top-12 left-0 lens-cluster animate-in" style={{ minWidth: '280px' }}>
-                  {LENSES.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => { setLens(l.id); setLensOpen(false); }}
-                      className={'lens-pill ' + (lens === l.id ? 'active' : '')}
-                    >
-                      {l.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="glass-panel rounded-2xl p-4 flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-2">
+              <Crosshair className="w-4 h-4 text-spy-cyan" />
+              <span className="spy-text text-[10px] tracking-widest text-spy-cyan">GLOBAL NETWORK</span>
             </div>
-            {!lensOpen && (
-              <span className="text-[13px] text-white/40">
-                Lens: <span className="text-white/70 font-medium">{LENSES.find(l => l.id === lens)?.label}</span>
-              </span>
-            )}
+            <GlobeVis />
           </div>
         </div>
 
-        {hasSearched && (
-          <div className="w-full max-w-2xl mt-6 pb-16 animate-in">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-white/40">
-                  {filteredResults.length} results
-                  {filterSource && ' (from ' + scrapedResults.length + ')'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-white/50 uppercase tracking-wider">
-                  {lens}
-                </span>
-                {filterSource && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/50 flex items-center gap-1">
-                    {filterSource}
-                    <button onClick={() => setFilterSource(null)} className="hover:text-white/80">
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                )}
+        <div className="max-w-3xl mx-auto text-center mb-12">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-spy-red" />
+              <span className="spy-text text-xs tracking-[0.3em] text-spy-red">TARGET ACQUISITION</span>
+              <Target className="w-5 h-5 text-spy-red" />
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Hunt Down <span className="text-spy-cyan glow-cyan">Contact Intel</span>
+            </h2>
+            <p className="text-white/50 text-sm max-w-xl mx-auto leading-relaxed">
+              Enter an organization name to scan corporate registries, social networks, and public directories for phone, fax, email, and LinkedIn intelligence.
+            </p>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="mt-8 relative">
+            <div className="glass-panel-luminous rounded-2xl p-1.5 luminous-border">
+              <div className="flex gap-1 mb-1.5 px-1">
+                {VERTICALS.map((v) => (
+                  <button key={v.id} onClick={() => setVertical(v.id)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg spy-text text-[10px] tracking-wider transition-all border ${
+                      vertical === v.id ? `${v.color} bg-white/10 border-white/20` : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                    }`}>
+                    <v.icon className="w-3.5 h-3.5" />{v.label}
+                  </button>
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-white/30">{searchTime.toFixed(0)}ms</span>
-                <button onClick={() => setShowFilters(!showFilters)} className="glass-button text-[11px] py-1.5 px-2.5">
-                  <Filter className="w-3 h-3 mr-1" />
-                  Filters
+              <div className="flex items-center gap-2 glass-input rounded-xl px-4 py-3">
+                <Search className="w-5 h-5 text-spy-cyan/60 flex-shrink-0" />
+                <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  placeholder="Enter organization name..."
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 spy-text text-sm" />
+                <button onClick={handleSearch} disabled={isLoading || !query.trim()}
+                  className="flex items-center gap-2 bg-spy-cyan/10 hover:bg-spy-cyan/20 text-spy-cyan px-4 py-2 rounded-lg spy-text text-xs tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-spy-cyan/30">
+                  <Zap className="w-3.5 h-3.5" />{isLoading ? "SCANNING..." : "ACQUIRE"}
                 </button>
               </div>
             </div>
+          </motion.div>
+        </div>
 
-            {showFilters && (
-              <div className="glass-surface rounded-xl p-3 mb-4 animate-in">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-white/40">Sort:</span>
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-                      className="text-[11px] bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/70 outline-none">
-                      <option value="score">Score</option>
-                      <option value="rank">Rank</option>
-                      <option value="source">Source</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-white/40">Source:</span>
-                    <select value={filterSource || ''} onChange={(e) => setFilterSource(e.target.value || null)}
-                      className="text-[11px] bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white/70 outline-none">
-                      <option value="">All</option>
-                      {sources.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <button onClick={() => exportResults('json')} className="glass-button text-[11px] py-1.5 px-2.5">
-                      <Download className="w-3 h-3 mr-1" /> JSON
-                    </button>
-                    <button onClick={() => exportResults('csv')} className="glass-button text-[11px] py-1.5 px-2.5">
-                      <Download className="w-3 h-3 mr-1" /> CSV
-                    </button>
-                  </div>
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="max-w-4xl mx-auto mb-8">
+              <div className="glass-panel rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Activity className="w-5 h-5 text-spy-cyan animate-pulse" />
+                  <h3 className="spy-text text-sm tracking-wider text-spy-cyan">SCANNING PROTOCOLS ACTIVE</h3>
                 </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-4 p-4 rounded-xl border border-red-400/30 bg-red-400/5 text-red-300 text-sm">
-                <p className="font-medium">Error</p>
-                <p className="text-xs mt-1 opacity-80">{error}</p>
-              </div>
-            )}
-
-            {intelligence && (
-              <div className="glass-surface rounded-xl p-4 mb-5 animate-in">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-4 h-4 text-teal-300/80" />
-                  <h3 className="text-[13px] font-medium text-white/80">Summary</h3>
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-white/40">
-                    {intelligence.confidence}% confidence
-                  </span>
-                </div>
-                <p className="text-[13px] text-white/50 leading-relaxed">
-                  {intelligence.summary || 'Results for "' + intelligence.query + '" using ' + intelligence.lens + ' lens.'}
-                </p>
-                {intelligence.queryExpansions.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" /> Related
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  {["CORP REGISTRY", "DNS SCAN", "LINKEDIN", "DIRECTORY"].map((src, i) => (
+                    <div key={src} className="glass-panel rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-2 h-2 rounded-full ${logs.length > i * 2 ? "bg-spy-green" : "bg-white/20"}`} />
+                        <span className="spy-text text-[10px] text-white/60">{src}</span>
+                      </div>
+                      <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                        <motion.div className="h-full bg-spy-cyan rounded-full" initial={{ width: 0 }} animate={{ width: logs.length > i * 2 ? "100%" : "0%" }} transition={{ duration: 0.5 }} />
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {intelligence.queryExpansions.map((q, i) => (
-                        <button key={i} onClick={() => { setQuery(q); performSearch(); }}
-                          className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70 transition-colors">
-                          {q}
-                        </button>
+                  ))}
+                </div>
+                <div className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
+                  {logs.map((log, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className={`${log.includes("ERROR") ? "text-spy-red" : log.includes("ACQUIRED") ? "text-spy-green" : "text-spy-cyan/70"}`}>{log}</motion.div>
+                  ))}
+                  {isLoading && <div className="text-spy-cyan/50 terminal-cursor">Processing...</div>}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {intelligence && intelligence.contacts && (
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-5xl mx-auto">
+              <div className="glass-panel-luminous rounded-2xl p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-spy-green" />
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`spy-text text-[10px] tracking-widest px-2 py-0.5 rounded bg-white/10 ${intelligence.vertical === "procurement" ? "text-spy-green" : intelligence.vertical === "provider" ? "text-spy-purple" : intelligence.vertical === "pricing" ? "text-spy-amber" : "text-spy-cyan"}`}>{intelligence.vertical?.toUpperCase() || "CONTACT"}</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">{intelligence.organization}</h3>
+                      <p className="text-xs text-white/50 spy-text">{intelligence.contacts.length} contact vectors identified</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="spy-text text-[10px] text-white/40">CONFIDENCE SCORE</div>
+                    <div className="text-2xl font-bold text-spy-green spy-text">{intelligence.confidence}%</div>
+                  </div>
+                </div>
+                {intelligence.signals && intelligence.signals.length > 0 && (
+                  <div className="mb-4">
+                    <div className="spy-text text-[10px] text-white/40 tracking-widest mb-2">INTELLIGENCE SIGNALS</div>
+                    <div className="flex flex-wrap gap-2">
+                      {intelligence.signals.map((sig, i) => (
+                        <span key={i} title={sig.description} className={`spy-text text-[10px] px-2 py-1 rounded-full border ${sig.score > 0 ? "bg-spy-green/10 text-spy-green border-spy-green/30" : "bg-spy-red/10 text-spy-red border-spy-red/30"}`}>{sig.name} {sig.score > 0 ? "+" : ""}{sig.score}</span>
                       ))}
                     </div>
                   </div>
                 )}
-                {intelligence.signals.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {intelligence.signals.map((sig, i) => (
-                      <span key={i}
-                        className={'text-[10px] px-2 py-0.5 rounded-full border ' + (sig.score > 0
-                          ? 'bg-emerald-500/10 text-emerald-300/80 border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-300/80 border-red-500/20')}
-                        title={sig.description}
-                      >
-                        {sig.name} {sig.score > 0 ? '+' : ''}{sig.score}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 {intelligence.note && (
-                  <div className="mt-3 bg-amber-400/5 border border-amber-400/20 rounded-lg p-2.5 flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400/70" />
-                    <p className="text-[11px] text-amber-300/70">{intelligence.note}</p>
+                  <div className="bg-spy-amber/10 border border-spy-amber/30 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-spy-amber spy-text">{intelligence.note}</p>
                   </div>
                 )}
+                <div className="flex flex-wrap gap-2">
+                  {intelligence.sources.map((source) => (
+                    <span key={source} className="spy-text text-[10px] px-2 py-1 rounded-full bg-white/5 text-white/50 border border-white/10">{source}</span>
+                  ))}
+                </div>
               </div>
-            )}
 
-            <div className="space-y-3">
-              {filteredResults.map((result, index) => (
-                <SearchResultCard key={result.url + index} result={result} index={index} />
-              ))}
-            </div>
-
-            {filteredResults.length === 0 && !isLoading && (
-              <div className="text-center py-12">
-                <Search className="h-8 w-8 text-white/20 mx-auto mb-3" />
-                <p className="text-sm text-white/40">No results found</p>
-                <p className="text-xs text-white/25 mt-1">Try a different query</p>
+              <div className="grid md:grid-cols-2 gap-4">
+                {intelligence.contacts.map((contact, index) => (
+                  <motion.div key={contact.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
+                    <div className="glass-panel-luminous rounded-xl p-4 luminous-border group hover:bg-white/[0.06] transition-all">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><ContactTypeIcon type={contact.type} /></div>
+                          <div><div className="text-[10px] uppercase tracking-widest text-white/40">{contact.type}</div><div className="text-sm font-medium text-white">{contact.label}</div></div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-white/40">Confidence</div>
+                          <div className={`text-xs font-bold ${contact.confidence > 90 ? "text-spy-green" : contact.confidence > 70 ? "text-spy-cyan" : "text-spy-amber"}`}>{contact.confidence}%</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <code className="flex-1 text-sm text-white bg-black/30 px-3 py-2 rounded-lg border border-white/10 truncate">{contact.value}</code>
+                        <button onClick={() => copyToClipboard(contact.value, contact.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
+                          {copiedId === contact.id ? <CheckCircle2 className="w-4 h-4 text-spy-green" /> : <Copy className="w-4 h-4 text-white/50" />}
+                        </button>
+                        {(contact.type === "linkedin" || contact.type === "website") && (
+                          <a href={contact.value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
+                            <ExternalLink className="w-4 h-4 text-white/50" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ChevronRight className="w-3 h-3 text-white/40" />
+                        <span className="text-[10px] text-white/40">{contact.source}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
-    </div>
-  );
-}
-
-function SearchResultCard({ result, index }) {
-  const domain = (() => {
-    try { return new URL(result.url).hostname.replace(/^www\./, ""); } catch { return ""; }
-  })();
-
-  const sourceStyle = SOURCE_COLORS[result.source] || "bg-white/5 text-white/40 border-white/10";
-
-  return (
-    <div className="result-card animate-in" style={{ animationDelay: (index * 40) + 'ms' }}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex-shrink-0">
-          <img
-            src={'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32'}
-            alt=""
-            className="w-5 h-5 rounded opacity-60"
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={'text-[10px] px-2 py-0.5 rounded-full border font-medium ' + sourceStyle}>
-              {result.source}
-            </span>
-            <span className="text-[10px] text-white/30 flex items-center gap-1">
-              <Clock className="h-2.5 w-2.5" />
-              #{result.rank || index + 1}
-            </span>
-          </div>
-          <a href={result.url} target="_blank" rel="noopener noreferrer" className="block group/link">
-            <h3 className="text-[14px] font-medium text-white/85 hover:text-teal-300/90 transition-colors line-clamp-1">
-              {result.title}
-            </h3>
-            <p className="text-[11px] text-teal-400/50 line-clamp-1 mt-0.5">{result.url}</p>
-          </a>
-          {result.description && (
-            <p className="text-[13px] text-white/40 mt-1.5 line-clamp-2">{result.description}</p>
-          )}
-          {result.intelligence && (
-            <div className="mt-2.5 p-2.5 bg-white/3 rounded-lg border border-white/5">
-              {isProcurementIntelligence(result.intelligence) && <ProcurementCard intelligence={result.intelligence} />}
-              {isProviderIntelligence(result.intelligence) && <ProviderCard intelligence={result.intelligence} />}
-              {isPricingIntelligence(result.intelligence) && <PricingCard intelligence={result.intelligence} />}
-              {isLegalIntelligence(result.intelligence) && <LegalCard intelligence={result.intelligence} />}
-              {isMedicalIntelligence(result.intelligence) && <MedicalCard intelligence={result.intelligence} />}
-              {isAcademicIntelligence(result.intelligence) && <AcademicCard intelligence={result.intelligence} />}
-              {isFinancialIntelligence(result.intelligence) && <FinancialCard intelligence={result.intelligence} />}
-            </div>
-          )}
-          <div className="flex items-center gap-2 mt-2">
-            <a href={result.url} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-1 text-[11px] text-teal-300/60 hover:text-teal-300/90 transition-colors">
-              <ExternalLink className="h-3 w-3" />
-              Visit
-            </a>
-            <span className="text-[11px] text-white/25">{domain}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function isProcurementIntelligence(obj) { return obj && 'opportunity_type' in obj && 'organization' in obj; }
-function isProviderIntelligence(obj) { return obj && 'provider_name' in obj && 'services_offered' in obj; }
-function isPricingIntelligence(obj) { return obj && 'service' in obj && 'price_cash' in obj; }
-function isLegalIntelligence(obj) { return obj && 'legal_type' in obj; }
-function isMedicalIntelligence(obj) { return obj && 'medical_type' in obj; }
-function isAcademicIntelligence(obj) { return obj && 'academic_type' in obj; }
-function isFinancialIntelligence(obj) { return obj && 'financial_type' in obj; }
-
-function ProcurementCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">{intelligence.opportunity_type}</Badge>
-        {intelligence.status && (
-          <Badge variant={intelligence.status === 'open' ? 'default' : 'secondary'} className="text-[10px]">{intelligence.status}</Badge>
-        )}
-      </div>
-      <div className="text-[13px] font-medium text-white/70">{intelligence.organization}</div>
-      <div className="text-[11px] text-white/35">{intelligence.service}</div>
-      {intelligence.due_date && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Calendar className="h-3 w-3" /> Due: {intelligence.due_date}
-        </div>
-      )}
-      {intelligence.monetary_value && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> {intelligence.monetary_value}
-        </div>
-      )}
-      {intelligence.procurement_email && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Mail className="h-3 w-3" /> {intelligence.procurement_email}
-        </div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function ProviderCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="text-[13px] font-medium text-white/70">{intelligence.provider_name}</div>
-      {intelligence.address && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <MapPin className="h-3 w-3" /> {intelligence.address}
-        </div>
-      )}
-      {intelligence.provider_phone && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Phone className="h-3 w-3" /> {intelligence.provider_phone}
-        </div>
-      )}
-      <div className="flex flex-wrap gap-1">
-        {intelligence.services_offered.map((service, i) => (
-          <Badge key={i} variant="secondary" className="text-[10px]">{service}</Badge>
-        ))}
-      </div>
-      {intelligence.credentials && intelligence.credentials.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {intelligence.credentials.map((cred, i) => (
-            <Badge key={i} variant="outline" className="text-[10px]">{cred}</Badge>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function PricingCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="text-[13px] font-medium text-white/70">{intelligence.provider_name}</div>
-      <div className="text-[11px] text-white/35">{intelligence.service}</div>
-      {intelligence.price_cash && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> Cash: {intelligence.price_cash}
-        </div>
-      )}
-      {intelligence.price_employer && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> Employer: {intelligence.price_employer}
-        </div>
-      )}
-      {intelligence.price_range && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> Range: {intelligence.price_range}
-        </div>
-      )}
-      {intelligence.payment_types && intelligence.payment_types.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {intelligence.payment_types.map((type, i) => (
-            <Badge key={i} variant="secondary" className="text-[10px]">{type}</Badge>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function LegalCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      {intelligence.legal_type && (
-        <Badge variant="outline" className="text-[10px]">{intelligence.legal_type}</Badge>
-      )}
-      {intelligence.case_name && (
-        <div className="text-[13px] font-medium text-white/70">{intelligence.case_name}</div>
-      )}
-      {intelligence.court && (
-        <div className="text-[11px] text-white/35">Court: {intelligence.court}</div>
-      )}
-      {intelligence.citation && (
-        <div className="text-[11px] text-white/35">Citation: {intelligence.citation}</div>
-      )}
-      {intelligence.decision_date && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Calendar className="h-3 w-3" /> {intelligence.decision_date}
-        </div>
-      )}
-      {intelligence.statute_name && (
-        <div className="text-[11px] text-white/35">Statute: {intelligence.statute_name}</div>
-      )}
-      {intelligence.regulation_number && (
-        <div className="text-[11px] text-white/35">Regulation: {intelligence.regulation_number}</div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function MedicalCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      {intelligence.medical_type && (
-        <Badge variant="outline" className="text-[10px]">{intelligence.medical_type}</Badge>
-      )}
-      {intelligence.condition && (
-        <div className="text-[13px] font-medium text-white/70">{intelligence.condition}</div>
-      )}
-      {intelligence.treatment && (
-        <div className="text-[11px] text-white/35">Treatment: {intelligence.treatment}</div>
-      )}
-      {intelligence.diagnosis && (
-        <div className="text-[11px] text-white/35">Diagnosis: {intelligence.diagnosis}</div>
-      )}
-      {intelligence.clinical_trial_id && (
-        <div className="text-[11px] text-white/35">Trial ID: {intelligence.clinical_trial_id}</div>
-      )}
-      {intelligence.publication_date && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Calendar className="h-3 w-3" /> {intelligence.publication_date}
-        </div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function AcademicCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      {intelligence.academic_type && (
-        <Badge variant="outline" className="text-[10px]">{intelligence.academic_type}</Badge>
-      )}
-      {intelligence.paper_title && (
-        <div className="text-[13px] font-medium text-white/70">{intelligence.paper_title}</div>
-      )}
-      {intelligence.journal && (
-        <div className="text-[11px] text-white/35">Journal: {intelligence.journal}</div>
-      )}
-      {intelligence.authors && intelligence.authors.length > 0 && (
-        <div className="text-[11px] text-white/35">
-          Authors: {intelligence.authors.slice(0, 3).join(', ')}
-          {intelligence.authors.length > 3 && ' et al.'}
-        </div>
-      )}
-      {intelligence.doi && (
-        <div className="text-[11px] text-white/35">DOI: {intelligence.doi}</div>
-      )}
-      {intelligence.citation_count && (
-        <div className="text-[11px] text-white/35">Citations: {intelligence.citation_count}</div>
-      )}
-      {intelligence.publication_date && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <Calendar className="h-3 w-3" /> {intelligence.publication_date}
-        </div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
-    </div>
-  );
-}
-
-function FinancialCard({ intelligence }) {
-  return (
-    <div className="space-y-1.5">
-      {intelligence.financial_type && (
-        <Badge variant="outline" className="text-[10px]">{intelligence.financial_type}</Badge>
-      )}
-      {intelligence.company_name && (
-        <div className="text-[13px] font-medium text-white/70">{intelligence.company_name}</div>
-      )}
-      {intelligence.ticker && (
-        <Badge variant="secondary" className="text-[10px]">{intelligence.ticker}</Badge>
-      )}
-      {intelligence.revenue && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> Revenue: {intelligence.revenue}
-        </div>
-      )}
-      {intelligence.profit && (
-        <div className="flex items-center gap-1 text-[11px] text-white/30">
-          <DollarSign className="h-3 w-3" /> Profit: {intelligence.profit}
-        </div>
-      )}
-      {intelligence.eps && (
-        <div className="text-[11px] text-white/35">EPS: {intelligence.eps}</div>
-      )}
-      {intelligence.reporting_period && (
-        <div className="text-[11px] text-white/35">Period: {intelligence.reporting_period}</div>
-      )}
-      <div className="flex items-center gap-1 text-[11px] text-white/30">
-        <CheckCircle className="h-3 w-3" /> Confidence: {intelligence.source_confidence}%
-      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export type SearchLens = 'web' | 'pdf' | 'government' | 'procurement' | 'pricing' | 'provider' | 'technical' | 'news' | 'legal' | 'medical' | 'academic' | 'financial'
+export type Vertical = 'contact' | 'procurement' | 'provider' | 'pricing' | 'general'
 
 export interface Signal {
   name: string
@@ -7,10 +7,17 @@ export interface Signal {
 }
 
 export interface IntelligenceObject {
-  query: string
-  lens: SearchLens
-  summary?: string
+  organization: string
+  vertical: Vertical
   confidence: number
+  contacts: Array<{
+    id: string
+    type: 'phone' | 'email' | 'fax' | 'linkedin' | 'website'
+    value: string
+    label: string
+    source: string
+    confidence: number
+  }>
   signals: Signal[]
   sources: string[]
   queryExpansions: string[]
@@ -34,468 +41,176 @@ interface VerticalConfig {
   }>
 }
 
-const LENS_CONFIGS: Record<SearchLens, VerticalConfig> = {
-  web: {
-    label: 'WEB',
-    description: 'Broad-spectrum web search',
-    keywords: [],
-    synonymMap: {},
+const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
+  contact: {
+    label: 'CONTACT INTEL',
+    description: 'Hunt phone, email, fax, LinkedIn, and web presence',
+    keywords: ['contact', 'phone', 'email', 'fax', 'reach', 'call', 'directory'],
+    synonymMap: {
+      company: ['corporation', 'inc', 'llc', 'organization', 'enterprise', 'firm', 'agency'],
+      contact: ['phone', 'email', 'fax', 'address', 'reach', 'connect'],
+      phone: ['telephone', 'direct line', 'main line', 'toll free', 'mobile', 'office'],
+      email: ['e-mail', 'contact email', 'support email', 'inquiries', 'info'],
+      linkedin: ['linked in', 'professional profile', 'company page'],
+    },
     expansions: (q) => [
-      `${q} information`,
-      `${q} about`,
-      `${q} services`,
-      `${q} overview`,
+      `${q} contact phone email`,
+      `${q} phone number`,
+      `${q} email address`,
+      `${q} LinkedIn`,
+      `${q} fax number`,
+      `${q} headquarters address`,
+      `${q} corporate office`,
+      `${q} customer service`,
     ],
     siteOperators: [],
     scoringRules: [
-      { pattern: /about|information|overview/i, score: 10, name: 'general info' },
-    ],
-  },
-
-  pdf: {
-    label: 'PDF',
-    description: 'Find PDF documents and files',
-    keywords: ['pdf', 'document', 'file', 'report', 'guide', 'manual'],
-    synonymMap: {
-      pdf: ['document', 'file', 'report', 'guide', 'manual', 'whitepaper'],
-    },
-    expansions: (q) => [
-      `filetype:pdf ${q}`,
-      `${q} pdf`,
-      `${q} document`,
-      `${q} report`,
-      `${q} guide`,
-    ],
-    siteOperators: ['filetype:pdf'],
-    scoringRules: [
-      { pattern: /filetype:pdf|\.pdf/i, score: 40, name: 'PDF document' },
-      { pattern: /document|report|guide|manual/i, score: 20, name: 'document language' },
-    ],
-  },
-
-  government: {
-    label: 'GOVERNMENT',
-    description: 'Find government sources and official documents',
-    keywords: ['government', 'official', 'federal', 'state', 'agency', 'department', 'county', 'city', 'municipal'],
-    synonymMap: {
-      government: ['federal', 'state', 'official', 'agency', 'department', 'authority', 'municipal', 'county', 'city'],
-    },
-    expansions: (q) => {
-      // Preserve user-entered site: queries
-      const hasSiteQuery = q.includes('site:')
-      const baseQuery = hasSiteQuery ? q : q
-      
-      const expansions = [
-        `site:.gov ${baseQuery}`,
-        `site:.us ${baseQuery}`,
-        `${baseQuery} government`,
-        `${baseQuery} official`,
-        `${baseQuery} agency`,
-        `${baseQuery} county`,
-        `${baseQuery} city`,
-        `${baseQuery} state`,
-        `${baseQuery} procurement`,
-        `${baseQuery} bid`,
-        `${baseQuery} RFP`,
-        `${baseQuery} solicitation`,
-        'occupational health site:.gov',
-        'occupational medicine site:.gov',
-      ]
-      
-      return expansions
-    },
-    siteOperators: ['site:.gov', 'site:.us'],
-    scoringRules: [
-      { pattern: /\.gov\b/i, score: 35, name: '.gov domain' },
-      { pattern: /\.us\b/i, score: 30, name: '.us domain' },
-      { pattern: /government|official|federal|state agency|county|city|municipal/i, score: 30, name: 'government source' },
-      { pattern: /procurement|bid|RFP|solicitation/i, score: 25, name: 'procurement content' },
-      { pattern: /occupational health|occupational medicine/i, score: 25, name: 'occupational health content' },
+      { pattern: /contact|phone|email/i, score: 25, name: 'contact keywords' },
+      { pattern: /headquarters|corporate office|main office/i, score: 20, name: 'corporate presence' },
+      { pattern: /linkedin\.com\/company/i, score: 35, name: 'LinkedIn company page' },
+      { pattern: /\+?1\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/, score: 30, name: 'phone number found' },
+      { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/, score: 25, name: 'email found' },
     ],
   },
 
   procurement: {
     label: 'PROCUREMENT INTEL',
     description: 'Find RFPs, bids, solicitations, and government contracts',
-    keywords: ['RFP', 'bid', 'solicitation', 'procurement', 'tender', 'contract', 'proposal', 'RFQ', 'RFT'],
+    keywords: ['RFP', 'bid', 'solicitation', 'procurement', 'tender', 'contract', 'proposal', 'solicitation'],
     synonymMap: {
-      RFP: ['request for proposal', 'solicitation', 'bid', 'tender', 'procurement', 'RFQ', 'RFT', 'request for qualifications'],
-      'occupational health': ['occupational medicine', 'worksite clinic', 'employee health', 'industrial medicine', 'pre-employment', 'employer clinic'],
-      services: ['contract', 'agreement', 'engagement', 'arrangement', 'professional services'],
-      open: ['active', 'current', 'accepting proposals', 'bid opportunity', 'vendor opportunity'],
+      RFP: ['request for proposal', 'solicitation', 'bid', 'tender', 'procurement', 'RFQ', 'RFT'],
+      'occupational health': ['occupational medicine', 'worksite clinic', 'employee health', 'industrial medicine', 'pre-employment'],
+      services: ['contract', 'agreement', 'engagement', 'arrangement'],
     },
-    expansions: (q) => {
-      const baseExpansions = [
-        `${q} RFP`,
-        `${q} solicitation`,
-        `${q} bid`,
-        `${q} procurement`,
-        `${q} contract opportunity`,
-        `${q} vendor opportunity`,
-        `${q} professional services agreement`,
-        `${q} competitive sealed proposal`,
-      ];
-      
-      const siteExpansions = [
-        `site:.gov ${q}`,
-        `site:sam.gov ${q}`,
-        `site:ionwave.net ${q}`,
-        `site:bonfirehub.com ${q}`,
-        `site:bidnetdirect.com ${q}`,
-        `site:planetbids.com ${q}`,
-      ];
-      
-      const pdfExpansions = [
-        `filetype:pdf ${q}`,
-        `${q} filetype:pdf`,
-      ];
-      
-      const active2026Expansions = [
-        `${q} 2026 open`,
-        `${q} 2026 active`,
-        `${q} 2026 solicitation currently open`,
-        `${q} bid opportunity 2026`,
-        `${q} due date 2026`,
-        `${q} responses due 2026`,
-        `${q} closing date 2026`,
-      ];
-      
-      const hiddenGoldmine = [
-        `${q} notice inviting bids`,
-        `${q} request for qualifications`,
-        `${q} procurement opportunity`,
-        `${q} current opportunities`,
-      ];
-      
-      return [...baseExpansions, ...siteExpansions, ...pdfExpansions, ...active2026Expansions, ...hiddenGoldmine];
-    },
-    siteOperators: ['site:.gov', 'site:sam.gov', 'site:ionwave.net', 'site:bonfirehub.com', 'site:planetbids.com', 'site:bidnetdirect.com'],
+    expansions: (q) => [
+      `${q} RFP`,
+      `${q} solicitation`,
+      `${q} bid`,
+      `${q} procurement`,
+      `${q} contract opportunity`,
+      `site:.gov ${q}`,
+      `site:sam.gov ${q}`,
+      `filetype:pdf ${q}`,
+      `${q} due date`,
+      `${q} proposal`,
+    ],
+    siteOperators: ['site:.gov', 'site:sam.gov', 'site:bonfirehub.com', 'site:planetbids.com'],
     scoringRules: [
       { pattern: /\.gov\b/i, score: 35, name: '.gov domain' },
-      { pattern: /RFP|solicitation|bid|tender|procurement|RFQ|RFT/i, score: 40, name: 'procurement language' },
-      { pattern: /due date|deadline|closing date|responses due|submission deadline/i, score: 25, name: 'includes deadline' },
-      { pattern: /open|active|current|accepting proposals|bid opportunity/i, score: 30, name: 'active opportunity' },
+      { pattern: /RFP|solicitation|bid|tender|procurement/i, score: 40, name: 'procurement language' },
+      { pattern: /due date|deadline|closing date/i, score: 20, name: 'includes deadline' },
       { pattern: /filetype:pdf|\.pdf/i, score: 40, name: 'PDF document' },
       { pattern: /\$[\d,]+(?:\.\d{2})?|\$\d+ million|\$\d+K/i, score: 15, name: 'monetary value' },
       { pattern: /SAM\.gov|bonfire|planetbids|ionwave|bidnet/i, score: 30, name: 'procurement portal' },
-      { pattern: /notice inviting bids|request for qualifications|competitive sealed proposal/i, score: 35, name: 'hidden goldmine terms' },
-      { pattern: /2026/i, score: 20, name: '2026 active' },
     ],
   },
 
-  technical: {
-    label: 'TECHNICAL',
-    description: 'Find technical documentation, code, and developer resources',
-    keywords: ['api', 'documentation', 'code', 'developer', 'github', 'stack overflow', 'programming'],
+  provider: {
+    label: 'PROVIDER INTEL',
+    description: 'Discover clinics, physicians, and healthcare providers',
+    keywords: ['clinic', 'provider', 'doctor', 'physician', 'healthcare', 'medical', 'practice'],
     synonymMap: {
-      api: ['interface', 'endpoint', 'rest', 'graphql', 'sdk'],
-      documentation: ['docs', 'guide', 'reference', 'manual', 'tutorial'],
-      code: ['source', 'repository', 'repo', 'programming', 'development'],
+      clinic: ['medical center', 'health center', 'practice', 'facility', 'office'],
+      provider: ['doctor', 'physician', 'practitioner', 'specialist', 'clinician'],
+      occupational: ['worksite', 'industrial', 'employee', 'corporate'],
     },
     expansions: (q) => [
-      `${q} api documentation`,
-      `${q} developer guide`,
-      `site:github.com ${q}`,
-      `site:stackoverflow.com ${q}`,
-      `${q} tutorial`,
-      `${q} code example`,
-    ],
-    siteOperators: ['site:github.com', 'site:stackoverflow.com', 'site:devdocs.io'],
-    scoringRules: [
-      { pattern: /github\.com/i, score: 30, name: 'GitHub source' },
-      { pattern: /stackoverflow\.com/i, score: 25, name: 'Stack Overflow' },
-      { pattern: /api|documentation|docs/i, score: 30, name: 'technical docs' },
-      { pattern: /code|programming|developer/i, score: 25, name: 'developer content' },
-    ],
-  },
-
-  news: {
-    label: 'NEWS',
-    description: 'Find recent news articles and press coverage',
-    keywords: ['news', 'press', 'article', 'report', 'breaking', 'coverage'],
-    synonymMap: {
-      news: ['press', 'article', 'report', 'coverage', 'breaking'],
-    },
-    expansions: (q) => [
-      `${q} news`,
-      `${q} press release`,
-      `${q} article`,
-      `${q} coverage`,
-      `${q} latest`,
+      `${q} clinic`,
+      `${q} provider directory`,
+      `${q} medical practice`,
+      `${q} healthcare provider`,
+      `${q} physician`,
+      `${q} services offered`,
+      `${q} locations`,
     ],
     siteOperators: [],
     scoringRules: [
-      { pattern: /news|press|article|coverage/i, score: 30, name: 'news content' },
-      { pattern: /breaking|latest|recent/i, score: 20, name: 'recent content' },
+      { pattern: /clinic|medical center|health center|practice/i, score: 30, name: 'provider entity' },
+      { pattern: /physician|doctor|provider|clinician/i, score: 25, name: 'provider keywords' },
+      { pattern: /board certified|licensed|accredited/i, score: 20, name: 'credentials' },
+      { pattern: /location|address|suite|floor/i, score: 15, name: 'physical address' },
     ],
   },
 
   pricing: {
     label: 'PRICING INTEL',
     description: 'Extract fee schedules, rates, and cost structures',
-    keywords: ['price', 'cost', 'fee', 'rate', 'schedule', 'pricing', 'charge', 'cash pay', 'self pay'],
+    keywords: ['price', 'cost', 'fee', 'rate', 'schedule', 'pricing', 'charge'],
     synonymMap: {
-      pricing: ['fee schedule', 'cost', 'rates', 'charges', 'fees', 'price list', 'rate card', 'chargemaster'],
-      'occupational health': ['occupational medicine', 'worksite clinic', 'employee health', 'industrial medicine', 'pre-employment', 'employer clinic'],
-      'PFT': ['spirometry', 'pulmonary function test', 'breathing test', 'lung function'],
-      'DOT': ['department of transportation', 'DOT physical', 'DOT exam', 'CDL physical'],
-      physical: ['exam', 'screening', 'medical exam', 'health screening', 'pre-employment physical'],
-      PDF: ['document', 'fee schedule', 'price list', 'rate sheet', 'transparency file'],
-      occupational: ['worksite', 'industrial', 'employee', 'corporate', 'employer'],
+      pricing: ['fee schedule', 'cost', 'rates', 'charges', 'fees', 'price list', 'rate card'],
+      PDF: ['document', 'fee schedule', 'price list', 'rate sheet'],
+      occupational: ['worksite', 'industrial', 'employee', 'corporate'],
     },
-    expansions: (q) => {
-      const baseExpansions = [
-        `${q} fee schedule`,
-        `${q} pricing`,
-        `${q} cost`,
-        `${q} rates`,
-        `${q} price list`,
-        `${q} fee structure`,
-        `${q} chargemaster`,
-      ];
-      
-      const pdfExpansions = [
-        `filetype:pdf ${q}`,
-        `${q} filetype:pdf`,
-        `${q} transparency file`,
-      ];
-      
-      const paymentTypeExpansions = [
-        `${q} self-pay pricing`,
-        `${q} cash pay`,
-        `${q} out-of-pocket cost`,
-        `${q} employer account`,
-        `${q} work comp`,
-        `${q} workers compensation`,
-      ];
-      
-      const providerExpansions = [
-        `${q} clinic`,
-        `${q} provider`,
-        `${q} urgent care`,
-        `${q} occupational medicine`,
-      ];
-      
-      return [...baseExpansions, ...pdfExpansions, ...paymentTypeExpansions, ...providerExpansions];
-    },
+    expansions: (q) => [
+      `${q} fee schedule`,
+      `${q} pricing`,
+      `filetype:pdf ${q}`,
+      `${q} cost`,
+      `${q} rates`,
+      `${q} price list`,
+      `${q} fee structure`,
+      `${q} self-pay pricing`,
+    ],
     siteOperators: ['filetype:pdf'],
     scoringRules: [
-      { pattern: /fee schedule|price list|rate card|fee structure|chargemaster/i, score: 40, name: 'pricing document' },
+      { pattern: /fee schedule|price list|rate card|fee structure/i, score: 40, name: 'pricing document' },
       { pattern: /filetype:pdf|\.pdf/i, score: 40, name: 'PDF document' },
       { pattern: /\$[\d,]+(?:\.\d{2})?|\$\d+\s*(million|k|K)?/i, score: 25, name: 'price values' },
-      { pattern: /self-pay|cash price|out-of-pocket|cash pay/i, score: 30, name: 'self-pay mention' },
-      { pattern: /employer account|work comp|workers compensation/i, score: 25, name: 'employer payment' },
-      { pattern: /spirometry|pulmonary function|PFT/i, score: 20, name: 'PFT pricing' },
-      { pattern: /DOT physical|CDL physical|department of transportation/i, score: 20, name: 'DOT pricing' },
+      { pattern: /self-pay|cash price|out-of-pocket/i, score: 20, name: 'self-pay mention' },
     ],
   },
 
-  provider: {
-    label: 'PROVIDER INTEL',
-    description: 'Find occupational health clinics, providers, and services',
-    keywords: ['clinic', 'provider', 'doctor', 'physician', 'healthcare', 'medical', 'practice', 'occupational health', 'occupational medicine'],
-    synonymMap: {
-      clinic: ['medical center', 'health center', 'practice', 'facility', 'office', 'urgent care'],
-      provider: ['doctor', 'physician', 'practitioner', 'specialist', 'clinician', 'medical group'],
-      'occupational health': ['occupational medicine', 'worksite clinic', 'employee health', 'industrial medicine', 'pre-employment', 'employer clinic'],
-      services: ['exams', 'screenings', 'physicals', 'testing', 'drug testing', 'DOT physical', 'PFT'],
-    },
-    expansions: (q) => {
-      const baseExpansions = [
-        `${q} clinic`,
-        `${q} provider directory`,
-        `${q} medical practice`,
-        `${q} healthcare provider`,
-        `${q} physician`,
-        `${q} services offered`,
-        `${q} locations`,
-      ];
-      
-      const serviceExpansions = [
-        `${q} occupational health services`,
-        `${q} DOT physical`,
-        `${q} drug testing`,
-        `${q} pre-employment physical`,
-        `${q} pulmonary function test`,
-        `${q} audiometry`,
-        `${q} respirator fit test`,
-      ];
-      
-      const locationExpansions = [
-        `${q} near me`,
-        `${q} locations`,
-        `${q} directory`,
-        `${q} clinic locations`,
-      ];
-      
-      return [...baseExpansions, ...serviceExpansions, ...locationExpansions];
-    },
+  general: {
+    label: 'GENERAL INTEL',
+    description: 'Broad-spectrum search across all vectors',
+    keywords: [],
+    synonymMap: {},
+    expansions: (q) => [
+      `${q} contact`,
+      `${q} information`,
+      `${q} about`,
+      `${q} services`,
+    ],
     siteOperators: [],
     scoringRules: [
-      { pattern: /clinic|medical center|health center|practice|facility/i, score: 30, name: 'provider entity' },
-      { pattern: /physician|doctor|provider|clinician|medical group/i, score: 25, name: 'provider keywords' },
-      { pattern: /board certified|licensed|accredited/i, score: 20, name: 'credentials' },
-      { pattern: /location|address|suite|floor/i, score: 15, name: 'physical address' },
-      { pattern: /occupational health|occupational medicine|worksite clinic/i, score: 35, name: 'occupational health provider' },
-      { pattern: /DOT physical|drug testing|pre-employment|PFT/i, score: 30, name: 'occupational services' },
+      { pattern: /contact|about|information/i, score: 10, name: 'general info' },
     ],
   },
-
-  legal: {
-    label: 'LEGAL',
-    description: 'Find legal documents, case law, statutes, and regulations',
-    keywords: ['law', 'legal', 'statute', 'regulation', 'case law', 'court', 'ruling', 'act', 'bill', 'legislation', 'compliance'],
-    synonymMap: {
-      legal: ['law', 'statute', 'regulation', 'compliance', 'legislation', 'act', 'bill'],
-      'case law': ['court ruling', 'judicial decision', 'precedent', 'case'],
-      regulation: ['rule', 'compliance', 'standard', 'requirement'],
-    },
-    expansions: (q) => [
-      `${q} law`,
-      `${q} legal`,
-      `${q} statute`,
-      `${q} regulation`,
-      `${q} case law`,
-      `${q} court ruling`,
-      `${q} compliance`,
-      `site:.gov ${q}`,
-    ],
-    siteOperators: ['site:.gov'],
-    scoringRules: [
-      { pattern: /statute|regulation|act|bill|legislation/i, score: 35, name: 'legal document' },
-      { pattern: /court|ruling|judgment|decision/i, score: 30, name: 'court content' },
-      { pattern: /\.gov\b/i, score: 25, name: 'government source' },
-      { pattern: /compliance|requirement|standard/i, score: 20, name: 'compliance content' },
-    ],
-  },
-
-  medical: {
-    label: 'MEDICAL',
-    description: 'Find medical research, clinical studies, and healthcare information',
-    keywords: ['medical', 'clinical', 'healthcare', 'study', 'research', 'treatment', 'diagnosis', 'therapy', 'medicine', 'health'],
-    synonymMap: {
-      medical: ['healthcare', 'clinical', 'medicine', 'health'],
-      study: ['research', 'trial', 'clinical trial', 'investigation'],
-      treatment: ['therapy', 'intervention', 'procedure'],
-    },
-    expansions: (q) => [
-      `${q} medical`,
-      `${q} clinical study`,
-      `${q} research`,
-      `${q} treatment`,
-      `${q} diagnosis`,
-      `${q} therapy`,
-      `site:.edu ${q}`,
-      `site:.gov ${q}`,
-    ],
-    siteOperators: ['site:.edu', 'site:.gov'],
-    scoringRules: [
-      { pattern: /clinical|study|research|trial/i, score: 35, name: 'research content' },
-      { pattern: /treatment|therapy|intervention/i, score: 30, name: 'treatment content' },
-      { pattern: /\.edu\b/i, score: 25, name: 'academic source' },
-      { pattern: /\.gov\b/i, score: 25, name: 'government source' },
-    ],
-  },
-
-  academic: {
-    label: 'ACADEMIC',
-    description: 'Find academic papers, research, and scholarly publications',
-    keywords: ['paper', 'research', 'study', 'journal', 'publication', 'scholarly', 'academic', 'thesis', 'dissertation', 'citation'],
-    synonymMap: {
-      paper: ['article', 'publication', 'journal', 'research'],
-      study: ['research', 'investigation', 'analysis'],
-      academic: ['scholarly', 'university', 'research'],
-    },
-    expansions: (q) => [
-      `${q} paper`,
-      `${q} research`,
-      `${q} study`,
-      `${q} journal`,
-      `${q} academic`,
-      `site:.edu ${q}`,
-      `filetype:pdf ${q}`,
-    ],
-    siteOperators: ['site:.edu', 'filetype:pdf'],
-    scoringRules: [
-      { pattern: /journal|publication|scholarly|academic/i, score: 35, name: 'academic content' },
-      { pattern: /filetype:pdf|\.pdf/i, score: 30, name: 'PDF document' },
-      { pattern: /\.edu\b/i, score: 30, name: 'academic source' },
-      { pattern: /abstract|citation|reference/i, score: 20, name: 'scholarly language' },
-    ],
-  },
-
-  financial: {
-    label: 'FINANCIAL',
-    description: 'Find financial reports, market data, and economic information',
-    keywords: ['financial', 'finance', 'market', 'stock', 'investment', 'economy', 'economic', 'report', 'earnings', 'revenue', 'profit'],
-    synonymMap: {
-      financial: ['finance', 'economic', 'monetary', 'fiscal'],
-      market: ['stock', 'equity', 'trading', 'investment'],
-      report: ['earnings', 'revenue', 'profit', 'financial statement'],
-    },
-    expansions: (q) => [
-      `${q} financial`,
-      `${q} market`,
-      `${q} investment`,
-      `${q} economic`,
-      `${q} report`,
-      `${q} earnings`,
-      `filetype:pdf ${q}`,
-    ],
-    siteOperators: ['filetype:pdf'],
-    scoringRules: [
-      { pattern: /financial|finance|economic|fiscal/i, score: 35, name: 'financial content' },
-      { pattern: /market|stock|investment|trading/i, score: 30, name: 'market content' },
-      { pattern: /earnings|revenue|profit|income/i, score: 30, name: 'financial metrics' },
-      { pattern: /filetype:pdf|\.pdf/i, score: 25, name: 'PDF document' },
-    ],
-  },
-
 }
 
 // ─── CLASSIFY VERTICAL ───
 
-export function classifyLens(query: string): SearchLens {
+export function classifyVertical(query: string): Vertical {
   const q = query.toLowerCase()
-  const scores: Record<SearchLens, number> = {
-    web: 1,
-    pdf: 0,
-    government: 0,
+  const scores: Record<Vertical, number> = {
+    contact: 0,
     procurement: 0,
-    pricing: 0,
     provider: 0,
-    technical: 0,
-    news: 0,
-    legal: 0,
-    medical: 0,
-    academic: 0,
-    financial: 0,
+    pricing: 0,
+    general: 1,
   }
 
-  for (const [lens, config] of Object.entries(LENS_CONFIGS)) {
-    if (lens === 'web') continue
+  for (const [vertical, config] of Object.entries(VERTICAL_CONFIGS)) {
+    if (vertical === 'general') continue
     for (const kw of config.keywords) {
       if (q.includes(kw.toLowerCase())) {
-        scores[lens as SearchLens] += 2
+        scores[vertical as Vertical] += 2
       }
     }
   }
 
   // Special weighting
   if (/\b(rfp|rfq|tender|solicitation|procurement|bid)\b/i.test(q)) scores.procurement += 5
+  if (/\b(clinic|physician|doctor|provider|medical)\b/i.test(q)) scores.provider += 5
   if (/\b(price|cost|fee|rate|pricing|schedule)\b/i.test(q)) scores.pricing += 5
-  if (/\b(clinic|provider|doctor|physician|occupational health|occupational medicine)\b/i.test(q)) scores.provider += 5
-  if (/\b(pdf|document|file|report|guide|manual)\b/i.test(q)) scores.pdf += 3
-  if (/\b(government|official|federal|state|agency)\b/i.test(q)) scores.government += 4
-  if (/\b(api|documentation|code|developer|github|programming)\b/i.test(q)) scores.technical += 4
-  if (/\b(news|press|article|coverage|breaking)\b/i.test(q)) scores.news += 4
+  if (/\b(contact|phone|email|fax)\b/i.test(q)) scores.contact += 3
 
-  let best: SearchLens = 'web'
+  let best: Vertical = 'general'
   let bestScore = 0
-  for (const [lens, s] of Object.entries(scores)) {
+  for (const [v, s] of Object.entries(scores)) {
     if (s > bestScore) {
       bestScore = s
-      best = lens as SearchLens
+      best = v as Vertical
     }
   }
 
@@ -506,15 +221,15 @@ export function classifyLens(query: string): SearchLens {
 
 export interface ExpandedQuery {
   original: string
-  lens: SearchLens
+  vertical: Vertical
   expansions: string[]
   withOperators: string[]
   synonyms: Record<string, string[]>
 }
 
-export function expandQuery(query: string, forcedLens?: SearchLens): ExpandedQuery {
-  const lens = forcedLens || classifyLens(query)
-  const config = LENS_CONFIGS[lens]
+export function expandQuery(query: string, forcedVertical?: Vertical): ExpandedQuery {
+  const vertical = forcedVertical || classifyVertical(query)
+  const config = VERTICAL_CONFIGS[vertical]
 
   // Build synonym map for this specific query
   const synonyms: Record<string, string[]> = {}
@@ -548,7 +263,7 @@ export function expandQuery(query: string, forcedLens?: SearchLens): ExpandedQue
 
   return {
     original: query,
-    lens,
+    vertical,
     expansions: [...new Set([...expansions, ...synonymVariants])],
     withOperators: [...new Set(withOperators)],
     synonyms,
@@ -571,72 +286,36 @@ export function scoreSignals(text: string, url?: string): Signal[] {
   if (/\.org\b/.test(url || '')) {
     signals.push({ name: '.org domain', score: 15, description: 'Non-profit organization' })
   }
-
-  // Procurement portal signals
-  if (/sam\.gov|bonfire|planetbids|ionwave|bidnet/i.test(url || '')) {
-    signals.push({ name: 'procurement portal', score: 30, description: 'Official procurement platform' })
+  if (/linkedin\.com/.test(url || '')) {
+    signals.push({ name: 'LinkedIn source', score: 35, description: 'Professional network verified' })
   }
 
-  // Content signals - Procurement
-  if (/RFP|solicitation|bid|tender|procurement|RFQ|RFT/i.test(text)) {
+  // Content signals
+  if (/RFP|request for proposal|solicitation|bid|tender|procurement/i.test(text)) {
     signals.push({ name: 'procurement language', score: 40, description: 'Contains procurement terminology' })
   }
-  if (/filetype:pdf|\.pdf/i.test(text)) {
-    signals.push({ name: 'PDF document', score: 40, description: 'PDF RFP document' })
-  }
-  if (/due date|deadline|closing date|responses due|submission deadline/i.test(text)) {
-    signals.push({ name: 'includes deadline', score: 25, description: 'Contains deadline information' })
-  }
-  if (/open|active|current|accepting proposals|bid opportunity/i.test(text)) {
-    signals.push({ name: 'active opportunity', score: 30, description: 'Currently accepting bids' })
-  }
-  if (/notice inviting bids|request for qualifications|competitive sealed proposal/i.test(text)) {
-    signals.push({ name: 'hidden goldmine terms', score: 35, description: 'Alternative procurement terminology' })
-  }
-  if (/2026/i.test(text)) {
-    signals.push({ name: '2026 active', score: 20, description: 'Current year opportunity' })
-  }
-
-  // Content signals - Pricing
-  if (/fee schedule|price list|rate card|fee structure|chargemaster/i.test(text)) {
+  if (/fee schedule|price list|rate card|pricing/i.test(text)) {
     signals.push({ name: 'pricing document', score: 40, description: 'Explicit pricing terminology' })
   }
-  if (/\$[\d,]+(?:\.\d{2})?|\$\d+\s*(million|k|K)?/i.test(text)) {
-    signals.push({ name: 'monetary values', score: 25, description: 'Contains dollar amounts' })
+  if (/due date|deadline|closing date|submission date/i.test(text)) {
+    signals.push({ name: 'time-sensitive', score: 20, description: 'Includes deadline information' })
   }
-  if (/self-pay|cash price|out-of-pocket|cash pay/i.test(text)) {
-    signals.push({ name: 'self-pay mention', score: 30, description: 'Self-pay pricing available' })
-  }
-  if (/employer account|work comp|workers compensation/i.test(text)) {
-    signals.push({ name: 'employer payment', score: 25, description: 'Employer billing options' })
-  }
-
-  // Content signals - Occupational Health
-  if (/occupational health|occupational medicine|worksite clinic|employee health/i.test(text)) {
-    signals.push({ name: 'occupational health match', score: 25, description: 'Exact service match' })
-  }
-  if (/DOT physical|CDL physical|department of transportation/i.test(text)) {
-    signals.push({ name: 'DOT physical', score: 20, description: 'DOT exam services' })
-  }
-  if (/spirometry|pulmonary function|PFT/i.test(text)) {
-    signals.push({ name: 'PFT pricing', score: 20, description: 'Pulmonary function testing' })
-  }
-  if (/drug testing|pre-employment physical|audiometry|respirator fit test/i.test(text)) {
-    signals.push({ name: 'occupational services', score: 25, description: 'Specific occupational health services' })
-  }
-
-  // Content signals - Provider
-  if (/clinic|medical center|health center|practice|facility/i.test(text)) {
-    signals.push({ name: 'provider entity', score: 30, description: 'Healthcare facility' })
-  }
-  if (/physician|doctor|provider|clinician|medical group/i.test(text)) {
-    signals.push({ name: 'provider keywords', score: 25, description: 'Medical provider' })
+  if (/\$[\d,]+(?:\.\d{2})?/i.test(text)) {
+    signals.push({ name: 'monetary values', score: 15, description: 'Contains dollar amounts' })
   }
   if (/board certified|licensed|accredited/i.test(text)) {
     signals.push({ name: 'credentials', score: 20, description: 'Professional credentials mentioned' })
   }
-  if (/location|address|suite|floor/i.test(text)) {
-    signals.push({ name: 'physical address', score: 15, description: 'Contains location information' })
+
+  // Contact signals
+  if (/\+?1\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(text)) {
+    signals.push({ name: 'phone detected', score: 25, description: 'Telephone number found in content' })
+  }
+  if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(text)) {
+    signals.push({ name: 'email detected', score: 25, description: 'Email address found in content' })
+  }
+  if (/linkedin\.com\/(?:company|in)\//.test(text)) {
+    signals.push({ name: 'LinkedIn profile', score: 30, description: 'LinkedIn presence confirmed' })
   }
 
   // Negative signals
@@ -644,21 +323,16 @@ export function scoreSignals(text: string, url?: string): Signal[] {
     signals.push({ name: 'suspicious content', score: -40, description: 'Potential spam or fraud indicators' })
   }
   if (/archive\.org|wayback|cached/i.test(url || '')) {
-    signals.push({ name: 'archived page', score: -25, description: 'Potentially outdated content' })
-  }
-  if (/directory|list|index|catalog/i.test(url || '')) {
-    signals.push({ name: 'junk directory', score: -20, description: 'Generic directory page' })
-  }
-  if (/404|not found|error|unavailable/i.test(text)) {
-    signals.push({ name: 'page error', score: -30, description: 'Page access issues' })
+    signals.push({ name: 'archived page', score: -15, description: 'Potentially outdated content' })
   }
 
   return signals
 }
 
-export function calculateConfidence(signals: Signal[]): number {
+export function calculateConfidence(signals: Signal[], baseContacts: number): number {
   const totalScore = signals.reduce((sum, s) => sum + s.score, 0)
-  const raw = Math.min(totalScore + 40, 100)
+  const contactBonus = Math.min(baseContacts * 5, 25)
+  const raw = Math.min(totalScore + contactBonus + 40, 100)
   return Math.max(0, Math.round(raw))
 }
 
@@ -667,6 +341,7 @@ export function calculateConfidence(signals: Signal[]): number {
 export function buildIntelligenceObject(
   query: string,
   expanded: ExpandedQuery,
+  contacts: IntelligenceObject['contacts'],
   rawSources: string[],
   rawTexts: string[],
   note?: string
@@ -684,16 +359,13 @@ export function buildIntelligenceObject(
     }
   }
 
-  const confidence = calculateConfidence(allSignals)
-
-  // Generate a summary based on signals and lens
-  const summary = generateSummary(query, expanded.lens, allSignals)
+  const confidence = calculateConfidence(allSignals, contacts.length)
 
   return {
-    query,
-    lens: expanded.lens,
-    summary,
+    organization: query,
+    vertical: expanded.vertical,
     confidence,
+    contacts,
     signals: allSignals,
     sources: [...new Set(rawSources)],
     queryExpansions: expanded.expansions,
@@ -702,10 +374,73 @@ export function buildIntelligenceObject(
   }
 }
 
-function generateSummary(query: string, lens: SearchLens, signals: Signal[]): string {
-  const signalNames = signals.filter(s => s.score > 0).map(s => s.name).slice(0, 3)
-  const signalText = signalNames.length > 0 ? signalNames.join(', ') : 'general content'
-  return `Results for "${query}" using ${lens} lens. Detected: ${signalText}. Found ${signals.length} relevance signals.`
+// ─── MOCK INTELLIGENCE OBJECTS BY VERTICAL ───
+
+export function generateMockIntelligence(query: string, vertical: Vertical): IntelligenceObject {
+  const slug = query.toLowerCase().replace(/\s+/g, '-')
+  const areaCode = 200 + Math.floor(Math.random() * 800)
+  const prefix = 300 + Math.floor(Math.random() * 700)
+  const line = 1000 + Math.floor(Math.random() * 9000)
+
+  const baseContacts: IntelligenceObject['contacts'] = [
+    {
+      id: '1',
+      type: 'phone',
+      value: `+1 (${areaCode}) ${prefix}-${line}`,
+      label: 'Main Office',
+      source: 'Corporate Registry',
+      confidence: 92,
+    },
+    {
+      id: '2',
+      type: 'email',
+      value: `info@${slug}.com`,
+      label: 'General Inquiries',
+      source: 'Website Crawl',
+      confidence: 88,
+    },
+    {
+      id: '3',
+      type: 'website',
+      value: `https://www.${slug}.com`,
+      label: 'Official Website',
+      source: 'DNS Lookup',
+      confidence: 96,
+    },
+    {
+      id: '4',
+      type: 'linkedin',
+      value: `https://linkedin.com/company/${slug}`,
+      label: 'Company Profile',
+      source: 'LinkedIn API',
+      confidence: 95,
+    },
+  ]
+
+  if (vertical === 'procurement') {
+    baseContacts.push({
+      id: '5',
+      type: 'email',
+      value: `procurement@${slug}.com`,
+      label: 'Procurement Office',
+      source: 'Government Portal',
+      confidence: 78,
+    })
+  }
+
+  const signals = scoreSignals(`${query} ${vertical} contact info`)
+
+  return {
+    organization: query,
+    vertical,
+    confidence: calculateConfidence(signals, baseContacts.length),
+    contacts: baseContacts,
+    signals,
+    sources: ['Corporate Registry', 'LinkedIn API', 'WHOIS Database', 'Public Directory', 'Website Crawl'],
+    queryExpansions: VERTICAL_CONFIGS[vertical].expansions(query),
+    timestamp: new Date().toISOString(),
+    note: 'Demonstration data. Live scraping unavailable.',
+  }
 }
 
-export { LENS_CONFIGS }
+export { VERTICAL_CONFIGS }

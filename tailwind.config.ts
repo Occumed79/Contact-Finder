@@ -43,6 +43,12 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        "spy-black": "#0a0f14",
+        "spy-cyan": "#00ffc8",
+        "spy-green": "#00ff88",
+        "spy-purple": "#a855f7",
+        "spy-amber": "#f59e0b",
+        "spy-red": "#ef4444",
       },
       borderRadius: {
         lg: "var(--radius)",

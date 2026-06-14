@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { type IntelligenceObject, type ScrapedResult, type SearchLens, type SearchSuggestion } from "@/types/search";
+import { type IntelligenceObject, type Vertical, type SearchSuggestion } from "../types/search";
 
 interface UseSearchReturn {
   query: string;
   setQuery: (q: string) => void;
-  lens: SearchLens;
-  setLens: (l: SearchLens) => void;
+  vertical: Vertical;
+  setVertical: (v: Vertical) => void;
   intelligence: IntelligenceObject | null;
-  scrapedResults: ScrapedResult[];
   isLoading: boolean;
   error: string | null;
   suggestions: SearchSuggestion[];
@@ -20,9 +19,8 @@ interface UseSearchReturn {
 
 export function useSearch(): UseSearchReturn {
   const [query, setQuery] = useState("");
-  const [lens, setLens] = useState<SearchLens>("web");
+  const [vertical, setVertical] = useState<Vertical>("general");
   const [intelligence, setIntelligence] = useState<IntelligenceObject | null>(null);
-  const [scrapedResults, setScrapedResults] = useState<ScrapedResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -40,42 +38,22 @@ export function useSearch(): UseSearchReturn {
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, lens }),
+        body: JSON.stringify({ query, vertical }),
       });
 
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
       }
 
-      const data = (await response.json()) as {
-        query: string;
-        lens: SearchLens;
-        summary?: string;
-        expandedQueries: string[];
-        signals: Array<{ name: string; score: number; description: string }>;
-        results: ScrapedResult[];
-        sources: string[];
-        timestamp: string;
-        confidence: number;
-      };
-      
-      setIntelligence({
-        query: data.query,
-        lens: data.lens,
-        summary: data.summary,
-        confidence: data.confidence,
-        signals: data.signals,
-        sources: data.sources,
-        queryExpansions: data.expandedQueries,
-        timestamp: data.timestamp,
-      });
-      setScrapedResults(data.results || []);
+      const data = (await response.json()) as IntelligenceObject;
+      setIntelligence(data);
       setHasSearched(true);
       setSearchTime(performance.now() - startTime);
 
-      if (data.expandedQueries?.length) {
+      // Mock suggestions based on query expansions
+      if (data.queryExpansions?.length) {
         setSuggestions(
-          data.expandedQueries.map((text, i) => ({
+          data.queryExpansions.map((text, i) => ({
             text,
             type: i === 0 ? ("related" as const) : ("ai" as const),
             score: 1 - i * 0.1,
@@ -89,15 +67,14 @@ export function useSearch(): UseSearchReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [query, lens]);
+  }, [query, vertical]);
 
   return {
     query,
     setQuery,
-    lens,
-    setLens,
+    vertical,
+    setVertical,
     intelligence,
-    scrapedResults,
     isLoading,
     error,
     suggestions,
