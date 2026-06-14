@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Clock, X, Search, Trash2, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Header } from "@/components/header";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import { SearchHistoryItem } from "@/types/search";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Header } from "../../components/header";
+import { useLocalStorage } from "../../hooks/use-local-storage";
+import { SearchHistoryItem } from "../../types/search";
 
 export default function HistoryPage() {
   const [history, setHistory] = useLocalStorage<SearchHistoryItem[]>("search-history", []);
