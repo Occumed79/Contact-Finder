@@ -19,14 +19,15 @@ A Kagi-style broad search browser with multi-engine aggregation, query intellige
 ### Currently Active
 - **Local BM25 Reranking**: In-memory BM25-style term frequency scoring for result relevance
 - **Document Text Extraction**: HTML, PDF, DOCX, and image text extraction with entity recognition (emails, phones, URLs, dates, monetary values)
-- **PDF Binary Parsing**: Direct binary PDF file parsing using pdf-parse library
-- **DOCX Binary Parsing**: Direct binary DOCX file parsing using mammoth library
-- **OCR (Optical Character Recognition)**: Text extraction from images using Tesseract.js with confidence scoring
+- **PDF Binary Parsing**: Direct binary PDF file parsing using pdf-parse library (8s timeout)
+- **DOCX Binary Parsing**: Direct binary DOCX file parsing using mammoth library (10s timeout)
 - **pgvector Retrieval**: PostgreSQL pgvector integration with pg library (requires DATABASE_URL and pgvector extension)
-- **Intelligence Object Extraction**: Automatic extraction of structured data for procurement, provider, and pricing lenses
+- **Intelligence Object Extraction**: Automatic extraction of structured data for procurement, provider, pricing, legal, medical, academic, and financial lenses
 - **Vector Storage**: Local in-memory adapter and PostgreSQL pgvector adapter for semantic search
 
-### Experimental
+### Experimental (Requires explicit opt-in via environment variables)
+- **Local Embedding Model**: @xenova/transformers with Xenova/all-MiniLM-L6-v2 (requires `ENABLE_LOCAL_EMBEDDINGS=true`, 60s timeout, falls back to hash-based embeddings)
+- **OCR (Optical Character Recognition)**: Text extraction from images using Tesseract.js (requires `ENABLE_OCR=true`, 30s timeout, disabled by default due to performance impact)
 - **Local Pseudo-Vector Reranking**: Hash-based TF-IDF vector approximation for semantic similarity (in-memory, not production-grade embeddings)
 - **Procurement Crawlers**: HTTP fetch adapters for SAM.gov, BonfireHub, IonWave, PlanetBids, BidNetDirect with improved CSS selectors and diagnostics
 
