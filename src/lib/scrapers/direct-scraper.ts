@@ -18,6 +18,16 @@ export async function scrapeLinkedInCompany(companyName: string): Promise<Direct
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
 
+  // Check if Playwright is available
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'LinkedIn Company',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
+
   try {
     const searchQuery = `${companyName} site:linkedin.com/company`
     const searchResult = await scraper.searchGoogle(searchQuery, 5)
@@ -89,6 +99,15 @@ export async function scrapeBusinessRegistry(companyName: string, state = 'DE'):
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
 
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'Business Registry',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
+
   try {
     const searchQuery = `${companyName} business entity ${state} site:sos.${state.toLowerCase()}.gov OR site:delaware.gov OR site:opencorporates.com`
     const searchResult = await scraper.searchGoogle(searchQuery, 5)
@@ -137,6 +156,15 @@ export async function scrapeBusinessRegistry(companyName: string, state = 'DE'):
 export async function scrapeCrunchbase(companyName: string): Promise<DirectScrapeResult> {
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
+
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'Crunchbase',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
 
   try {
     const searchQuery = `${companyName} site:crunchbase.com`
@@ -215,6 +243,15 @@ export async function scrapeSAMgov(companyName: string): Promise<DirectScrapeRes
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
 
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'SAM.gov',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
+
   try {
     const searchQuery = `${companyName} site:sam.gov OR site:beta.sam.gov`
     const searchResult = await scraper.searchGoogle(searchQuery, 5)
@@ -277,6 +314,15 @@ export async function scrapeSAMgov(companyName: string): Promise<DirectScrapeRes
 export async function scrapeCompanyWebsite(companyName: string): Promise<DirectScrapeResult> {
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
+
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'Company Website',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
 
   try {
     const searchQuery = `${companyName} official website`
@@ -390,6 +436,15 @@ export async function scrapeCompanyWebsite(companyName: string): Promise<DirectS
 export async function scrapeHealthcareDirectory(providerName: string): Promise<DirectScrapeResult> {
   const scraper = await getPlaywrightScraper()
   const contacts: DirectScrapeResult['contacts'] = []
+
+  if (!scraper.isAvailable()) {
+    return {
+      contacts,
+      source: 'Healthcare Directory',
+      success: false,
+      error: 'Playwright not available (serverless environment)',
+    }
+  }
 
   try {
     const searchQuery = `${providerName} healthcare provider site:healthgrades.com OR site:webmd.com OR site:vitals.com OR site:zocdoc.com`

@@ -12,6 +12,7 @@ export interface PlaywrightScrapeResult {
 export class PlaywrightScraper {
   private browser: Browser | null = null
   private context: BrowserContext | null = null
+  private available: boolean = false
 
   async init() {
     if (this.browser) return
@@ -40,15 +41,32 @@ export class PlaywrightScraper {
         Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
         Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] })
       })
+
+      this.available = true
     } catch (error) {
-      console.error('Failed to initialize Playwright:', error)
-      throw error
+      console.error('Failed to initialize Playwright (will skip this dimension):', error)
+      this.available = false
+      // Don't throw - allow other dimensions to work
     }
   }
 
+  isAvailable(): boolean {
+    return this.available && this.browser !== null && this.context !== null
+  }
+
   async scrapeUrl(url: string, timeout = 10000): Promise<PlaywrightScrapeResult> {
-    if (!this.browser || !this.context) {
+    if (!this.isAvailable()) {
       await this.init()
+    }
+
+    if (!this.isAvailable()) {
+      return {
+        text: '',
+        urls: [],
+        source: url,
+        success: false,
+        error: 'Playwright not available (serverless environment)',
+      }
     }
 
     const page = await this.context!.newPage()
@@ -99,8 +117,19 @@ export class PlaywrightScraper {
   }
 
   async searchGoogle(query: string, numResults = 10): Promise<PlaywrightScrapeResult> {
-    if (!this.browser || !this.context) {
+    if (!this.isAvailable()) {
       await this.init()
+    }
+
+    if (!this.isAvailable()) {
+      return {
+        text: '',
+        urls: [],
+        pageTitle: `Google Search: ${query}`,
+        source: 'Google (Playwright)',
+        success: false,
+        error: 'Playwright not available (serverless environment)',
+      }
     }
 
     const page = await this.context!.newPage()
@@ -170,8 +199,19 @@ export class PlaywrightScraper {
   }
 
   async searchBing(query: string, numResults = 10): Promise<PlaywrightScrapeResult> {
-    if (!this.browser || !this.context) {
+    if (!this.isAvailable()) {
       await this.init()
+    }
+
+    if (!this.isAvailable()) {
+      return {
+        text: '',
+        urls: [],
+        pageTitle: `Bing Search: ${query}`,
+        source: 'Bing (Playwright)',
+        success: false,
+        error: 'Playwright not available (serverless environment)',
+      }
     }
 
     const page = await this.context!.newPage()
@@ -226,8 +266,19 @@ export class PlaywrightScraper {
   }
 
   async searchDuckDuckGo(query: string): Promise<PlaywrightScrapeResult> {
-    if (!this.browser || !this.context) {
+    if (!this.isAvailable()) {
       await this.init()
+    }
+
+    if (!this.isAvailable()) {
+      return {
+        text: '',
+        urls: [],
+        pageTitle: `DuckDuckGo Search: ${query}`,
+        source: 'DuckDuckGo (Playwright)',
+        success: false,
+        error: 'Playwright not available (serverless environment)',
+      }
     }
 
     const page = await this.context!.newPage()
