@@ -3,6 +3,7 @@ import { fetchViaCorsProxy, searchGoogleViaProxy, searchBingViaProxy, searchDuck
 import { searchAllApis, type ApiSearchResult } from './api-scraper'
 import { scrapeAllDirectSources, type DirectScrapeResult } from './direct-scraper'
 import { searchScrapeGraphAI, scrapeGraphAIDirectSearch, type ScrapeGraphResult } from './scrapegraph-scraper'
+import { searchGemini, geminiDirectSearch, type GeminiResult } from './gemini-scraper'
 import { extractEmails, extractPhones, extractLinkedIn, extractWebsites, extractFax } from '../search'
 import type { Vertical } from '../intelligence'
 
@@ -23,6 +24,7 @@ export interface MultiDimensionResult {
     api: { success: boolean; sources: string[] }
     direct: { success: boolean; sources: string[] }
     scrapegraph: { success: boolean; sources: string[] }
+    gemini: { success: boolean; sources: string[] }
   }
   totalMethodsAttempted: number
   successfulMethods: number
@@ -42,6 +44,7 @@ export async function multiDimensionSearch(
     api: { success: false, sources: [] },
     direct: { success: false, sources: [] },
     scrapegraph: { success: false, sources: [] },
+    gemini: { success: false, sources: [] },
   }
 
   let id = 1
@@ -261,17 +264,52 @@ export async function multiDimensionSearch(
     console.error('ScrapeGraphAI dimension failed:', error)
   }
 
+  // ── Dimension 6: Gemini AI ──
+  try {
+    const [geminiResult, geminiDirectResult] = await Promise.allSettled([
+      searchGemini(query),
+      geminiDirectSearch(query),
+    ])
+
+    if (geminiResult.status === 'fulfilled' && geminiResult.value.success) {
+      methodBreakdown.gemini.success = true
+      methodBreakdown.gemini.sources.push('Gemini')
+      rawTexts.push(geminiResult.value.text)
+
+      for (const contact of geminiResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Gemini', 94)
+      }
+
+      sources.push('Gemini')
+    }
+
+    if (geminiDirectResult.status === 'fulfilled' && geminiDirectResult.value.success) {
+      methodBreakdown.gemini.success = true
+      methodBreakdown.gemini.sources.push('Gemini Direct')
+      rawTexts.push(geminiDirectResult.value.text)
+
+      for (const contact of geminiDirectResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Gemini Direct', 94)
+      }
+
+      sources.push('Gemini Direct')
+    }
+  } catch (error) {
+    console.error('Gemini dimension failed:', error)
+  }
+
   // ── Cleanup ──
   await closePlaywrightScraper()
 
   // ── Calculate stats ──
-  const totalMethodsAttempted = 5
+  const totalMethodsAttempted = 6
   const successfulMethods = [
     methodBreakdown.playwright.success,
     methodBreakdown.corsProxy.success,
     methodBreakdown.api.success,
     methodBreakdown.direct.success,
     methodBreakdown.scrapegraph.success,
+    methodBreakdown.gemini.success,
   ].filter(Boolean).length
 
   return {
