@@ -241,38 +241,49 @@ export async function searchIntelligence(
   const expanded = expandQuery(query, forcedLens)
   const lens = expanded.lens
 
-  // Use specialized procurement crawlers for procurement lens
+  // Use specialized procurement crawlers for procurement lens (with timeout)
   if (lens === 'procurement') {
     try {
-      const procurementOpportunities = await crawlAllProcurementSources(query)
-      const procurementResults = procurementOpportunities.map(procurementToScrapedResult)
-      
-      // Enrich with intelligence objects
-      const enrichedResults = await Promise.all(
-        procurementResults.map(async (result) => {
-          try {
-            const content = await scrapeWebsite(result.url)
-            if (content.length > 100) {
-              const intelligence = extractIntelligence(content, result.url, result.title, lens)
-              if (intelligence) {
-                return { ...result, intelligence }
+      // Add timeout wrapper for procurement crawler phase
+      const procurementPromise = (async () => {
+        const procurementOpportunities = await crawlAllProcurementSources(query)
+        const procurementResults = procurementOpportunities.map(procurementToScrapedResult)
+        
+        // Enrich with intelligence objects
+        const enrichedResults = await Promise.all(
+          procurementResults.map(async (result) => {
+            try {
+              const content = await scrapeWebsite(result.url)
+              if (content.length > 100) {
+                const intelligence = extractIntelligence(content, result.url, result.title, lens)
+                if (intelligence) {
+                  return { ...result, intelligence }
+                }
               }
+            } catch {
+              // If scraping fails, return result without intelligence
             }
-          } catch {
-            // If scraping fails, return result without intelligence
-          }
-          return result
-        })
+            return result
+          })
+        )
+        
+        const sources = procurementOpportunities.map(opp => opp.source)
+        const rawTexts = procurementOpportunities.map(opp => opp.title + ' ' + opp.description)
+        const text = rawTexts.join(' ')
+        
+        const intelligence = buildIntelligenceObject(query, expanded, sources, rawTexts)
+        return { intelligence, results: enrichedResults }
+      })()
+
+      // Timeout after 15 seconds for entire procurement phase
+      const timeoutPromise = new Promise<{ intelligence: IntelligenceObject; results: ScrapedResult[] }>((_, reject) =>
+        setTimeout(() => reject(new Error('Procurement crawler phase timeout')), 15000)
       )
-      
-      const sources = procurementOpportunities.map(opp => opp.source)
-      const rawTexts = procurementOpportunities.map(opp => opp.title + ' ' + opp.description)
-      const text = rawTexts.join(' ')
-      
-      const intelligence = buildIntelligenceObject(query, expanded, sources, rawTexts)
-      return { intelligence, results: enrichedResults }
+
+      const procurementResult = await Promise.race([procurementPromise, timeoutPromise])
+      return procurementResult
     } catch (err) {
-      console.warn('Procurement crawlers failed, falling back to general search:', err)
+      console.warn('Procurement crawlers failed or timed out, falling back to general search:', err)
       // Fall through to general search
     }
   }
@@ -285,17 +296,23 @@ export async function searchIntelligence(
 
   const { text, sources, rawTexts, results } = await searchAllEngines(allQueries)
 
-  // Semantic reranking for better relevance
-  const reranked = rerankResults(
-    query,
-    results.map(r => ({ id: r.url, text: r.title + ' ' + r.description, url: r.url, title: r.title, source: r.source })),
-    results.length
-  )
-  
-  // Reorder results based on semantic scores
-  const semanticallyOrderedResults = reranked
-    .map(r => results[r.originalIndex])
-    .map((result, index) => ({ ...result, rank: index + 1 }))
+  // Semantic reranking for better relevance (with error handling)
+  let semanticallyOrderedResults = results
+  try {
+    const reranked = rerankResults(
+      query,
+      results.map(r => ({ id: r.url, text: r.title + ' ' + r.description, url: r.url, title: r.title, source: r.source })),
+      results.length
+    )
+    
+    // Reorder results based on semantic scores
+    semanticallyOrderedResults = reranked
+      .map(r => results[r.originalIndex])
+      .map((result, index) => ({ ...result, rank: index + 1 }))
+  } catch (err) {
+    console.warn('Semantic reranking failed, using original results order:', err)
+    semanticallyOrderedResults = results.map((result, index) => ({ ...result, rank: index + 1 }))
+  }
 
   // Enrich results with intelligence objects for relevant lenses
   const enrichedResults = await Promise.all(

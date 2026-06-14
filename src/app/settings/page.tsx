@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard, Cpu } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Switch } from "../../components/ui/switch";
+import { Badge } from "../../components/ui/badge";
 import { Header } from "../../components/header";
 import { useTheme } from "next-themes";
 import { useLocalStorage } from "../../hooks/use-local-storage";
 import { UserSettings, SearchSource } from "../../types/search";
+import { FEATURE_CAPABILITIES, type FeatureStatus } from "../../lib/feature-capabilities";
 
 const defaultSettings: UserSettings = {
   theme: "system",
@@ -232,8 +234,49 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Advanced Features */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Cpu className="h-5 w-5" />
+                Advanced Features
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {FEATURE_CAPABILITIES.map((feature) => (
+                  <div key={feature.id} className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-sm">{feature.label}</p>
+                        <StatusBadge status={feature.status} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{feature.description}</p>
+                      {feature.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">{feature.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: FeatureStatus }) {
+  const variants: Record<FeatureStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+    active: { label: "Active", variant: "default" },
+    experimental: { label: "Experimental", variant: "secondary" },
+    scaffold: { label: "Scaffold", variant: "outline" },
+    planned: { label: "Planned", variant: "outline" },
+  };
+  
+  const { label, variant } = variants[status];
+  
+  return <Badge variant={variant} className="text-xs">{label}</Badge>;
 }
