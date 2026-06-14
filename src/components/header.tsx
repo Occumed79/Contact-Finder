@@ -1,87 +1,52 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Search, Settings, History, Bookmark, Moon, Sun, Zap, Keyboard, Menu } from "lucide-react";
-import { Button } from "./ui/button";
 import Link from "next/link";
-import { useTheme } from "next-themes";
+import { Clock as ClockIcon, Bookmark, Settings } from "lucide-react";
 
-interface HeaderProps {
-  onToggleFilters: () => void;
-  onToggleShortcuts: () => void;
+function OccuMedLogo({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 200 60" className={className} fill="none">
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(220,235,255,0.95)" />
+          <stop offset="100%" stopColor="rgba(180,210,240,0.7)" />
+        </linearGradient>
+        <filter id="logoGlow">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      <path d="M8 48 L8 12 C8 8 14 8 16 12 L24 36 L32 12 C34 8 40 8 40 12 L40 48"
+            stroke="url(#logoGrad)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"
+            fill="none" filter="url(#logoGlow)" />
+      <text x="52" y="38" fill="url(#logoGrad)" fontSize="22" fontWeight="600"
+            fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+            letterSpacing="1.5" filter="url(#logoGlow)">
+        OCCU-MED
+      </text>
+    </svg>
+  );
 }
 
-export function Header({ onToggleFilters, onToggleShortcuts }: HeaderProps) {
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+export function Header() {
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-      <div className="container flex h-14 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <Menu className="h-5 w-5" />
-          </Button>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="h-6 w-6 text-primary" />
-              <Zap className="h-3 w-3 text-amber-500 absolute -top-1 -right-1" />
-            </div>
-            <span className="font-bold text-lg hidden sm:inline">
-              <span className="text-gradient">Omni</span>Search
-            </span>
-          </Link>
-        </div>
-
-        <nav className="hidden md:flex items-center gap-1">
-          <Link href="/history">
-            <Button variant="ghost" size="sm" className="h-8">
-              <History className="h-4 w-4 mr-2" />
-              History
-            </Button>
-          </Link>
-          <Link href="/bookmarks">
-            <Button variant="ghost" size="sm" className="h-8">
-              <Bookmark className="h-4 w-4 mr-2" />
-              Bookmarks
-            </Button>
-          </Link>
-          <Link href="/settings">
-            <Button variant="ghost" size="sm" className="h-8">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {!mounted ? (
-              <Sun className="h-4 w-4 opacity-0" />
-            ) : resolvedTheme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hidden md:flex"
-            onClick={onToggleShortcuts}
-          >
-            <Keyboard className="h-4 w-4" />
-          </Button>
-        </div>
+    <header className="relative z-10 flex items-center justify-between px-6 py-5">
+      <Link href="/" className="logo-glow">
+        <OccuMedLogo className="h-9 w-auto" />
+      </Link>
+      <div className="flex items-center gap-2">
+        <Link href="/history" className="glass-button">
+          <ClockIcon className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">History</span>
+        </Link>
+        <Link href="/bookmarks" className="glass-button">
+          <Bookmark className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Bookmarks</span>
+        </Link>
+        <Link href="/settings" className="glass-button">
+          <Settings className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Settings</span>
+        </Link>
       </div>
     </header>
   );

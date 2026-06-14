@@ -1,17 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard, Cpu, Database } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Globe, Zap, Keyboard, Cpu, Database } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
-import { Badge } from "../../components/ui/badge";
 import { Header } from "../../components/header";
 import { useTheme } from "next-themes";
 import { useLocalStorage } from "../../hooks/use-local-storage";
 import { UserSettings, SearchSource } from "../../types/search";
 import { FEATURE_CAPABILITIES, type FeatureStatus } from "../../lib/feature-capabilities";
-import { type CrawlerDiagnostics } from "../../lib/procurement-crawlers";
 
 const defaultSettings: UserSettings = {
   theme: "system",
@@ -65,278 +61,218 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header onToggleFilters={() => {}} onToggleShortcuts={() => {}} />
+    <div className="min-h-screen relative">
+      <div className="liquid-bg">
+        <div className="aurora-1" />
+        <div className="aurora-2" />
+        <div className="aurora-3" />
+        <div className="glass-bubble bubble-1" />
+        <div className="glass-bubble bubble-2" />
+        <div className="glass-bubble bubble-3" />
+      </div>
 
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
+      <Header />
+
+      <main className="relative z-10 container mx-auto px-4 py-8 max-w-3xl">
         <div className="flex items-center gap-3 mb-6">
-          <Settings className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <SettingsIcon className="h-6 w-6 text-teal-300/80" />
+          <h1 className="text-2xl font-bold text-white/90">Settings</h1>
           {saved && (
-            <span className="text-sm text-green-600 animate-in fade-in">
+            <span className="text-sm text-emerald-300/80 animate-in fade-in">
               Saved!
             </span>
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Appearance */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Monitor className="h-5 w-5" />
-                Appearance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Theme</label>
-                <div className="flex gap-2">
-                  {[
-                    { value: "light", icon: Sun, label: "Light" },
-                    { value: "dark", icon: Moon, label: "Dark" },
-                    { value: "system", icon: Monitor, label: "System" },
-                  ].map((option) => (
-                    <Button
-                      key={option.value}
-                      variant={theme === option.value ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setTheme(option.value)}
-                    >
-                      <option.icon className="h-4 w-4 mr-2" />
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Monitor className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Appearance</h2>
+            </div>
+            <div className="space-y-3">
+              <label className="text-sm text-white/60 block">Theme</label>
+              <div className="flex gap-2">
+                {[
+                  { value: "light", icon: Sun, label: "Light" },
+                  { value: "dark", icon: Moon, label: "Dark" },
+                  { value: "system", icon: Monitor, label: "System" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setTheme(option.value)}
+                    className={`flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border transition-all ${
+                      theme === option.value
+                        ? 'bg-white/10 border-white/20 text-white/90'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/[0.07]'
+                    }`}
+                  >
+                    <option.icon className="h-4 w-4" />
+                    {option.label}
+                  </button>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Sources */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Default Sources
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {sourceOptions.map((source) => (
-                  <Button
-                    key={source.value}
-                    variant={
-                      settings.defaultSources.includes(source.value)
-                        ? "secondary"
-                        : "ghost"
-                    }
-                    size="sm"
-                    onClick={() => toggleSource(source.value)}
-                  >
-                    {source.label}
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Default Sources</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sourceOptions.map((source) => (
+                <button
+                  key={source.value}
+                  onClick={() => toggleSource(source.value)}
+                  className={`text-[12px] px-3 py-1.5 rounded-full border transition-all ${
+                    settings.defaultSources.includes(source.value)
+                      ? 'bg-white/10 border-white/20 text-white/90'
+                      : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/[0.07]'
+                  }`}
+                >
+                  {source.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Search Behavior */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                Search Behavior
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Auto-summarize</p>
-                  <p className="text-sm text-muted-foreground">
-                    Generate AI summaries for search results
-                  </p>
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Search Behavior</h2>
+            </div>
+            <div className="space-y-4">
+              {[
+                { key: 'autoSummarize', label: 'Auto-summarize', desc: 'Generate AI summaries for search results' },
+                { key: 'safeSearch', label: 'Safe Search', desc: 'Filter out explicit content' },
+                { key: 'openInNewTab', label: 'Open in New Tab', desc: 'Open result links in a new tab' },
+                { key: 'showFavicons', label: 'Show Favicons', desc: 'Display website icons in results' },
+                { key: 'showDescriptions', label: 'Show Descriptions', desc: 'Display result descriptions' },
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[13px] font-medium text-white/80">{item.label}</p>
+                    <p className="text-[12px] text-white/35">{item.desc}</p>
+                  </div>
+                  <Switch
+                    checked={settings[item.key as keyof UserSettings] as boolean}
+                    onCheckedChange={(v) => updateSetting(item.key as keyof UserSettings, v)}
+                  />
                 </div>
-                <Switch
-                  checked={settings.autoSummarize}
-                  onCheckedChange={(v) => updateSetting("autoSummarize", v)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Safe Search</p>
-                  <p className="text-sm text-muted-foreground">
-                    Filter out explicit content
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.safeSearch}
-                  onCheckedChange={(v) => updateSetting("safeSearch", v)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Open in New Tab</p>
-                  <p className="text-sm text-muted-foreground">
-                    Open result links in a new tab
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.openInNewTab}
-                  onCheckedChange={(v) => updateSetting("openInNewTab", v)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Show Favicons</p>
-                  <p className="text-sm text-muted-foreground">
-                    Display website icons in results
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.showFavicons}
-                  onCheckedChange={(v) => updateSetting("showFavicons", v)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Show Descriptions</p>
-                  <p className="text-sm text-muted-foreground">
-                    Display result descriptions
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.showDescriptions}
-                  onCheckedChange={(v) => updateSetting("showDescriptions", v)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </div>
 
           {/* Keyboard */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Keyboard className="h-5 w-5" />
-                Keyboard Shortcuts
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Enable Shortcuts</p>
-                  <p className="text-sm text-muted-foreground">
-                    Use keyboard shortcuts for faster navigation
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.keyboardShortcuts}
-                  onCheckedChange={(v) => updateSetting("keyboardShortcuts", v)}
-                />
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Keyboard className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Keyboard Shortcuts</h2>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-medium text-white/80">Enable Shortcuts</p>
+                <p className="text-[12px] text-white/35">Use keyboard shortcuts for faster navigation</p>
               </div>
-            </CardContent>
-          </Card>
+              <Switch
+                checked={settings.keyboardShortcuts}
+                onCheckedChange={(v) => updateSetting("keyboardShortcuts", v)}
+              />
+            </div>
+          </div>
 
           {/* Advanced Features */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Cpu className="h-5 w-5" />
-                Advanced Features
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {FEATURE_CAPABILITIES.map((feature) => (
-                  <div key={feature.id} className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm">{feature.label}</p>
-                        <StatusBadge status={feature.status} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">{feature.description}</p>
-                      {feature.notes && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">{feature.notes}</p>
-                      )}
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Cpu className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Advanced Features</h2>
+            </div>
+            <div className="space-y-3">
+              {FEATURE_CAPABILITIES.map((feature) => (
+                <div key={feature.id} className="flex items-start justify-between gap-4 p-3 rounded-lg border border-white/5 bg-white/[0.03]">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-[13px] text-white/80">{feature.label}</p>
+                      <StatusBadge status={feature.status} />
                     </div>
+                    <p className="text-[11px] text-white/35">{feature.description}</p>
+                    {feature.notes && (
+                      <p className="text-[11px] text-white/25 mt-1 italic">{feature.notes}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="pt-4 mt-4 border-t border-white/5">
+              <p className="text-[13px] font-medium text-white/80 mb-2">Procurement Search Diagnostics</p>
+              <p className="text-[11px] text-white/35 mb-3">
+                Procurement search uses web search with query expansion, PDF extraction, and ranking boosts. Diagnostics are logged to console during searches.
+              </p>
+              <div className="grid grid-cols-1 gap-2 text-[11px]">
+                {[
+                  { color: 'bg-blue-400', text: 'Query Expansion: RFP, RFQ, bid, solicitation, site:.gov, site:.us, PDF' },
+                  { color: 'bg-emerald-400', text: 'PDF Extraction: Automatic for .gov/.us and PDF URLs' },
+                  { color: 'bg-purple-400', text: 'Ranking Boosts: .gov domains, procurement terms, occupational health' },
+                  { color: 'bg-orange-400', text: 'Intelligence: Procurement, pricing, provider extraction' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${item.color}`}></div>
+                    <span className="text-white/35">{item.text}</span>
                   </div>
                 ))}
               </div>
-              
-              <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">Procurement Search Diagnostics</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Procurement search uses web search with query expansion, PDF extraction, and ranking boosts. Diagnostics are logged to console during searches.
-                </p>
-                <div className="grid grid-cols-1 gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-muted-foreground">Query Expansion: RFP, RFQ, bid, solicitation, site:.gov, site:.us, PDF</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <span className="text-muted-foreground">PDF Extraction: Automatic for .gov/.us and PDF URLs</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                    <span className="text-muted-foreground">Ranking Boosts: .gov domains, procurement terms, occupational health</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                    <span className="text-muted-foreground">Intelligence: Procurement, pricing, provider extraction</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Database Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Database Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="glass-surface rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Database className="h-5 w-5 text-white/60" />
+              <h2 className="text-[15px] font-semibold text-white/80">Database Configuration</h2>
+            </div>
+            <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium mb-2">DATABASE_URL (Server-Side Only)</p>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className="text-[13px] font-medium text-white/80 mb-2">DATABASE_URL (Server-Side Only)</p>
+                <p className="text-[11px] text-white/35 mb-3">
                   PostgreSQL connection string for pgvector integration. This must be configured as an environment variable on your deployment platform (e.g., Render, Vercel). The browser never sees the raw connection string.
                 </p>
-                <div className="p-3 bg-muted/50 rounded-lg border">
-                  <p className="text-xs text-muted-foreground">
-                    <strong>Configuration:</strong> Set <code className="bg-background px-1 py-0.5 rounded text-xs">DATABASE_URL</code> in your deployment environment variables.
+                <div className="p-3 bg-white/[0.03] rounded-lg border border-white/5">
+                  <p className="text-[11px] text-white/35">
+                    <strong className="text-white/60">Configuration:</strong> Set <code className="bg-white/5 px-1 py-0.5 rounded text-[10px]">DATABASE_URL</code> in your deployment environment variables.
                   </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    <strong>Example:</strong> <code className="bg-background px-1 py-0.5 rounded text-xs">postgresql://user:password@host:port/database</code>
+                  <p className="text-[11px] text-white/35 mt-2">
+                    <strong className="text-white/60">Example:</strong> <code className="bg-white/5 px-1 py-0.5 rounded text-[10px]">postgresql://user:password@host:port/database</code>
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-[11px] text-white/25 mt-2">
                   If DATABASE_URL is not configured, the app uses local in-memory vector storage only.
                 </p>
               </div>
-              <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">pgvector Capabilities</p>
-                <p className="text-xs text-muted-foreground mb-3">
+              <div className="pt-4 border-t border-white/5">
+                <p className="text-[13px] font-medium text-white/80 mb-2">pgvector Capabilities</p>
+                <p className="text-[11px] text-white/35 mb-3">
                   When DATABASE_URL is configured, the app automatically initializes the pgvector extension and schema on first use.
                 </p>
-                <div className="grid grid-cols-1 gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-muted-foreground">Automatic schema initialization</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-muted-foreground">Vector similarity search with cosine distance</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="text-muted-foreground">Persistent document storage</span>
-                  </div>
+                <div className="grid grid-cols-1 gap-2 text-[11px]">
+                  {[
+                    'Automatic schema initialization',
+                    'Vector similarity search with cosine distance',
+                    'Persistent document storage',
+                  ].map((text, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                      <span className="text-white/35">{text}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </main>
     </div>
@@ -344,15 +280,20 @@ export default function SettingsPage() {
 }
 
 function StatusBadge({ status }: { status: FeatureStatus }) {
-  const variants: Record<FeatureStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-    active: { label: "Active", variant: "default" },
-    experimental: { label: "Experimental", variant: "secondary" },
-    scaffold: { label: "Scaffold", variant: "outline" },
-    planned: { label: "Planned", variant: "outline" },
-    blocked: { label: "Blocked", variant: "destructive" },
+  const styles: Record<FeatureStatus, string> = {
+    active: 'bg-emerald-500/15 text-emerald-300/80 border-emerald-500/20',
+    experimental: 'bg-teal-500/15 text-teal-300/80 border-teal-500/20',
+    scaffold: 'bg-white/5 text-white/40 border-white/10',
+    planned: 'bg-white/5 text-white/40 border-white/10',
+    blocked: 'bg-red-500/15 text-red-300/80 border-red-500/20',
   };
-  
-  const { label, variant } = variants[status];
-  
-  return <Badge variant={variant} className="text-xs">{label}</Badge>;
+  const labels: Record<FeatureStatus, string> = {
+    active: 'Active', experimental: 'Experimental', scaffold: 'Scaffold',
+    planned: 'Planned', blocked: 'Blocked',
+  };
+  return (
+    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  );
 }
