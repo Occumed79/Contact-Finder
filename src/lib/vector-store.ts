@@ -123,35 +123,171 @@ export class LocalVectorStoreAdapter implements VectorStoreAdapter {
   }
 }
 
-// ─── PGVECTOR STORE ADAPTER (Planned - Not Implemented) ───
+// ─── PGVECTOR STORE ADAPTER ───
+
+import { Pool, PoolClient } from 'pg'
 
 export class PgVectorStoreAdapter implements VectorStoreAdapter {
-  constructor(connectionString: string) {
-    throw new Error('PgVectorStoreAdapter is not implemented. Requires PostgreSQL with pgvector extension and database schema.')
+  private pool: Pool
+  private tableName: string
+  
+  constructor(connectionString: string, tableName = 'documents') {
+    this.pool = new Pool({ connectionString })
+    this.tableName = tableName
+  }
+  
+  async initialize(): Promise<void> {
+    const client = await this.pool.connect()
+    try {
+      // Create pgvector extension
+      await client.query('CREATE EXTENSION IF NOT EXISTS vector')
+      
+      // Create documents table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ${this.tableName} (
+          id TEXT PRIMARY KEY,
+          text TEXT NOT NULL,
+          embedding vector(1536),
+          url TEXT,
+          title TEXT,
+          source TEXT,
+          lens TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `)
+      
+      // Create index for vector similarity search
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS ${this.tableName}_embedding_idx 
+        ON ${this.tableName} 
+        USING ivfflat (embedding vector_cosine_ops)
+      `)
+    } finally {
+      client.release()
+    }
   }
   
   async addDocument(document: SearchDocument): Promise<void> {
-    throw new Error('Not implemented')
+    const client = await this.pool.connect()
+    try {
+      await client.query(
+        `INSERT INTO ${this.tableName} (id, text, embedding, url, title, source, lens, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO UPDATE SET
+           text = EXCLUDED.text,
+           embedding = EXCLUDED.embedding,
+           url = EXCLUDED.url,
+           title = EXCLUDED.title,
+           source = EXCLUDED.source,
+           lens = EXCLUDED.lens,
+           metadata = EXCLUDED.metadata`,
+        [
+          document.id,
+          document.text,
+          document.embedding ? `[${document.embedding.join(',')}]` : null,
+          document.metadata.url || null,
+          document.metadata.title || null,
+          document.metadata.source || null,
+          document.metadata.lens || null,
+          JSON.stringify(document.metadata),
+        ]
+      )
+    } finally {
+      client.release()
+    }
   }
   
   async addDocuments(documents: SearchDocument[]): Promise<void> {
-    throw new Error('Not implemented')
+    for (const doc of documents) {
+      await this.addDocument(doc)
+    }
   }
   
-  async search(query: string, topK?: number): Promise<SearchDocument[]> {
-    throw new Error('Not implemented')
+  async search(query: string, topK = 10): Promise<SearchDocument[]> {
+    // For text search, use full-text search
+    const client = await this.pool.connect()
+    try {
+      const result = await client.query(
+        `SELECT id, text, embedding, url, title, source, lens, metadata
+         FROM ${this.tableName}
+         WHERE text ILIKE $1
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [`%${query}%`, topK]
+      )
+      
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        text: row.text,
+        embedding: row.embedding ? row.embedding.slice(1, -1).split(',').map(Number) : undefined,
+        metadata: {
+          url: row.url,
+          title: row.title,
+          source: row.source,
+          lens: row.lens,
+          ...row.metadata,
+        },
+      }))
+    } finally {
+      client.release()
+    }
   }
   
-  async searchByVector(vector: number[], topK?: number): Promise<SearchDocument[]> {
-    throw new Error('Not implemented')
+  async searchByVector(vector: number[], topK = 10): Promise<SearchDocument[]> {
+    if (!vector || vector.length === 0) {
+      return []
+    }
+    
+    const client = await this.pool.connect()
+    try {
+      const result = await client.query(
+        `SELECT id, text, embedding, url, title, source, lens, metadata,
+                1 - (embedding <=> $1) as similarity
+         FROM ${this.tableName}
+         WHERE embedding IS NOT NULL
+         ORDER BY embedding <=> $1
+         LIMIT $2`,
+        [`[${vector.join(',')}]`, topK]
+      )
+      
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        text: row.text,
+        embedding: row.embedding ? row.embedding.slice(1, -1).split(',').map(Number) : undefined,
+        metadata: {
+          url: row.url,
+          title: row.title,
+          source: row.source,
+          lens: row.lens,
+          ...row.metadata,
+        },
+      }))
+    } finally {
+      client.release()
+    }
   }
   
   async deleteDocument(id: string): Promise<void> {
-    throw new Error('Not implemented')
+    const client = await this.pool.connect()
+    try {
+      await client.query(`DELETE FROM ${this.tableName} WHERE id = $1`, [id])
+    } finally {
+      client.release()
+    }
   }
   
   async clear(): Promise<void> {
-    throw new Error('Not implemented')
+    const client = await this.pool.connect()
+    try {
+      await client.query(`DELETE FROM ${this.tableName}`)
+    } finally {
+      client.release()
+    }
+  }
+  
+  async close(): Promise<void> {
+    await this.pool.end()
   }
 }
 

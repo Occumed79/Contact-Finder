@@ -1,5 +1,7 @@
 import * as cheerio from 'cheerio'
 import pdfParse from 'pdf-parse'
+import Tesseract from 'tesseract.js'
+import mammoth from 'mammoth'
 
 // ─── DOCUMENT EXTRACTION LAYER ───
 
@@ -12,6 +14,7 @@ export interface ExtractedDocument {
     author?: string
     createdDate?: string
     modifiedDate?: string
+    ocrConfidence?: number
   }
   entities: {
     emails: string[]
@@ -233,16 +236,77 @@ export function extractFromPDFText(pdfText: string, metadata?: any): ExtractedDo
 }
 
 /**
- * Extract from DOCX (simulated - would use mammoth in production)
+ * Extract from DOCX using mammoth (binary parsing)
  */
-export function extractFromDOCX(docxContent: string): ExtractedDocument {
+export async function extractFromDOCXBuffer(buffer: Buffer): Promise<ExtractionResult> {
+  try {
+    const result = await mammoth.extractRawText({ buffer })
+    const text = result.value.replace(/\s+/g, ' ').trim()
+    
+    if (text.length < 10) {
+      return {
+        success: false,
+        error: 'DOCX extraction returned insufficient text',
+      }
+    }
+    
+    const lines = text.split('\n').filter((l: string) => l.trim())
+    const title = lines[0]?.trim() || undefined
+    
+    const headers: string[] = []
+    lines.forEach((line: string) => {
+      if (/^[A-Z][A-Z\s]{8,}$/.test(line) || /^\d+\.\s+[A-Z]/.test(line)) {
+        headers.push(line.trim())
+      }
+    })
+    
+    const paragraphs: string[] = []
+    let currentPara = ''
+    lines.forEach((line: string) => {
+      if (line.trim().length === 0) {
+        if (currentPara.length > 30) {
+          paragraphs.push(currentPara.trim())
+          currentPara = ''
+        }
+      } else {
+        currentPara += line + ' '
+      }
+    })
+    if (currentPara.length > 30) paragraphs.push(currentPara.trim())
+    
+    const entities = extractEntities(text)
+    
+    return {
+      success: true,
+      document: {
+        text,
+        title,
+        metadata: {
+          fileType: 'docx',
+        },
+        entities,
+        sections: { headers, paragraphs, tables: [] },
+      },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'DOCX parsing failed',
+    }
+  }
+}
+
+/**
+ * Extract from DOCX text (fallback for pre-extracted text)
+ */
+export function extractFromDOCXText(docxContent: string): ExtractedDocument {
   const text = docxContent.replace(/\s+/g, ' ').trim()
   
-  const lines = text.split('\n').filter(l => l.trim())
+  const lines = text.split('\n').filter((l: string) => l.trim())
   const title = lines[0]?.trim() || undefined
   
   const headers: string[] = []
-  lines.forEach(line => {
+  lines.forEach((line: string) => {
     if (/^[A-Z][A-Z\s]{8,}$/.test(line) || /^\d+\.\s+[A-Z]/.test(line)) {
       headers.push(line.trim())
     }
@@ -250,7 +314,7 @@ export function extractFromDOCX(docxContent: string): ExtractedDocument {
   
   const paragraphs: string[] = []
   let currentPara = ''
-  lines.forEach(line => {
+  lines.forEach((line: string) => {
     if (line.trim().length === 0) {
       if (currentPara.length > 30) {
         paragraphs.push(currentPara.trim())
@@ -270,6 +334,61 @@ export function extractFromDOCX(docxContent: string): ExtractedDocument {
     metadata: { fileType: 'docx' },
     entities,
     sections: { headers, paragraphs, tables: [] },
+  }
+}
+
+/**
+ * Extract text from image using OCR (Tesseract.js)
+ */
+export async function extractFromImage(imageBuffer: Buffer, timeout = 30000): Promise<ExtractionResult> {
+  try {
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: (m: any) => {
+        if (m.status === 'recognizing text') {
+          console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
+        }
+      },
+    })
+    
+    const result = await worker.recognize(imageBuffer)
+    await worker.terminate()
+    
+    const text = result.data.text.replace(/\s+/g, ' ').trim()
+    
+    if (text.length < 10) {
+      return {
+        success: false,
+        error: 'OCR returned insufficient text',
+      }
+    }
+    
+    const lines = text.split('\n').filter((l: string) => l.trim())
+    const title = lines[0]?.trim() || undefined
+    
+    const entities = extractEntities(text)
+    
+    return {
+      success: true,
+      document: {
+        text,
+        title,
+        metadata: {
+          fileType: 'image',
+          ocrConfidence: result.data.confidence,
+        },
+        entities,
+        sections: {
+          headers: [],
+          paragraphs: lines.filter((l: string) => l.length > 20),
+          tables: [],
+        },
+      },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'OCR processing failed',
+    }
   }
 }
 
@@ -307,6 +426,18 @@ export async function fetchAndExtractFromURL(url: string, timeout = 10000): Prom
       return await extractFromPDFBuffer(buffer)
     }
     
+    // Handle DOCX
+    if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') || url.toLowerCase().endsWith('.docx')) {
+      const buffer = Buffer.from(await res.arrayBuffer())
+      return await extractFromDOCXBuffer(buffer)
+    }
+    
+    // Handle images (OCR)
+    if (contentType.includes('image/') || /\.(png|jpg|jpeg|gif|bmp|tiff|webp)$/i.test(url)) {
+      const buffer = Buffer.from(await res.arrayBuffer())
+      return await extractFromImage(buffer, timeout)
+    }
+    
     // Handle HTML
     const html = await res.text()
     const document = extractFromHTML(html)
@@ -339,7 +470,7 @@ export async function extractDocument(
     case 'pdf':
       return extractFromPDFText(content, metadata)
     case 'docx':
-      return extractFromDOCX(content)
+      return extractFromDOCXText(content)
     case 'text':
       return {
         text: content.replace(/\s+/g, ' ').trim(),

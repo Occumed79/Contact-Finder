@@ -1,4 +1,4 @@
-export type SearchLens = 'web' | 'pdf' | 'government' | 'procurement' | 'pricing' | 'provider' | 'technical' | 'news'
+export type SearchLens = 'web' | 'pdf' | 'government' | 'procurement' | 'pricing' | 'provider' | 'technical' | 'news' | 'legal' | 'medical' | 'academic' | 'financial'
 
 export interface Signal {
   name: string
@@ -320,6 +320,116 @@ const LENS_CONFIGS: Record<SearchLens, VerticalConfig> = {
     ],
   },
 
+  legal: {
+    label: 'LEGAL',
+    description: 'Find legal documents, case law, statutes, and regulations',
+    keywords: ['law', 'legal', 'statute', 'regulation', 'case law', 'court', 'ruling', 'act', 'bill', 'legislation', 'compliance'],
+    synonymMap: {
+      legal: ['law', 'statute', 'regulation', 'compliance', 'legislation', 'act', 'bill'],
+      'case law': ['court ruling', 'judicial decision', 'precedent', 'case'],
+      regulation: ['rule', 'compliance', 'standard', 'requirement'],
+    },
+    expansions: (q) => [
+      `${q} law`,
+      `${q} legal`,
+      `${q} statute`,
+      `${q} regulation`,
+      `${q} case law`,
+      `${q} court ruling`,
+      `${q} compliance`,
+      `site:.gov ${q}`,
+    ],
+    siteOperators: ['site:.gov'],
+    scoringRules: [
+      { pattern: /statute|regulation|act|bill|legislation/i, score: 35, name: 'legal document' },
+      { pattern: /court|ruling|judgment|decision/i, score: 30, name: 'court content' },
+      { pattern: /\.gov\b/i, score: 25, name: 'government source' },
+      { pattern: /compliance|requirement|standard/i, score: 20, name: 'compliance content' },
+    ],
+  },
+
+  medical: {
+    label: 'MEDICAL',
+    description: 'Find medical research, clinical studies, and healthcare information',
+    keywords: ['medical', 'clinical', 'healthcare', 'study', 'research', 'treatment', 'diagnosis', 'therapy', 'medicine', 'health'],
+    synonymMap: {
+      medical: ['healthcare', 'clinical', 'medicine', 'health'],
+      study: ['research', 'trial', 'clinical trial', 'investigation'],
+      treatment: ['therapy', 'intervention', 'procedure'],
+    },
+    expansions: (q) => [
+      `${q} medical`,
+      `${q} clinical study`,
+      `${q} research`,
+      `${q} treatment`,
+      `${q} diagnosis`,
+      `${q} therapy`,
+      `site:.edu ${q}`,
+      `site:.gov ${q}`,
+    ],
+    siteOperators: ['site:.edu', 'site:.gov'],
+    scoringRules: [
+      { pattern: /clinical|study|research|trial/i, score: 35, name: 'research content' },
+      { pattern: /treatment|therapy|intervention/i, score: 30, name: 'treatment content' },
+      { pattern: /\.edu\b/i, score: 25, name: 'academic source' },
+      { pattern: /\.gov\b/i, score: 25, name: 'government source' },
+    ],
+  },
+
+  academic: {
+    label: 'ACADEMIC',
+    description: 'Find academic papers, research, and scholarly publications',
+    keywords: ['paper', 'research', 'study', 'journal', 'publication', 'scholarly', 'academic', 'thesis', 'dissertation', 'citation'],
+    synonymMap: {
+      paper: ['article', 'publication', 'journal', 'research'],
+      study: ['research', 'investigation', 'analysis'],
+      academic: ['scholarly', 'university', 'research'],
+    },
+    expansions: (q) => [
+      `${q} paper`,
+      `${q} research`,
+      `${q} study`,
+      `${q} journal`,
+      `${q} academic`,
+      `site:.edu ${q}`,
+      `filetype:pdf ${q}`,
+    ],
+    siteOperators: ['site:.edu', 'filetype:pdf'],
+    scoringRules: [
+      { pattern: /journal|publication|scholarly|academic/i, score: 35, name: 'academic content' },
+      { pattern: /filetype:pdf|\.pdf/i, score: 30, name: 'PDF document' },
+      { pattern: /\.edu\b/i, score: 30, name: 'academic source' },
+      { pattern: /abstract|citation|reference/i, score: 20, name: 'scholarly language' },
+    ],
+  },
+
+  financial: {
+    label: 'FINANCIAL',
+    description: 'Find financial reports, market data, and economic information',
+    keywords: ['financial', 'finance', 'market', 'stock', 'investment', 'economy', 'economic', 'report', 'earnings', 'revenue', 'profit'],
+    synonymMap: {
+      financial: ['finance', 'economic', 'monetary', 'fiscal'],
+      market: ['stock', 'equity', 'trading', 'investment'],
+      report: ['earnings', 'revenue', 'profit', 'financial statement'],
+    },
+    expansions: (q) => [
+      `${q} financial`,
+      `${q} market`,
+      `${q} investment`,
+      `${q} economic`,
+      `${q} report`,
+      `${q} earnings`,
+      `filetype:pdf ${q}`,
+    ],
+    siteOperators: ['filetype:pdf'],
+    scoringRules: [
+      { pattern: /financial|finance|economic|fiscal/i, score: 35, name: 'financial content' },
+      { pattern: /market|stock|investment|trading/i, score: 30, name: 'market content' },
+      { pattern: /earnings|revenue|profit|income/i, score: 30, name: 'financial metrics' },
+      { pattern: /filetype:pdf|\.pdf/i, score: 25, name: 'PDF document' },
+    ],
+  },
+
 }
 
 // ─── CLASSIFY VERTICAL ───
@@ -335,6 +445,10 @@ export function classifyLens(query: string): SearchLens {
     provider: 0,
     technical: 0,
     news: 0,
+    legal: 0,
+    medical: 0,
+    academic: 0,
+    financial: 0,
   }
 
   for (const [lens, config] of Object.entries(LENS_CONFIGS)) {

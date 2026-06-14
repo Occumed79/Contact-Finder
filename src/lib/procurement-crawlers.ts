@@ -93,12 +93,12 @@ export async function crawlSAMGov(query: string): Promise<{ opportunities: Procu
       }
     }
     
-    $('.usa-card, .solicitation-card, .card').each((_, el) => {
-      const title = $(el).find('.usa-card__heading, .title, h3, h4').first().text().trim()
-      const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.org-name, .agency, .organization').first().text().trim()
-      const dueDate = $(el).find('.due-date, .deadline, .closing-date').first().text().trim()
-      const postedDate = $(el).find('.posted-date, .post-date').first().text().trim()
+    $('.usa-card, .solicitation-card, .card, .listing, .opportunity, .result').each((_, el) => {
+      const title = $(el).find('.usa-card__heading, .title, h3, h4, h2, .heading, .solicitation-title').first().text().trim()
+      const link = $(el).find('a[href]').first().attr('href')
+      const organization = $(el).find('.org-name, .agency, .organization, .entity, .department, .office').first().text().trim()
+      const dueDate = $(el).find('.due-date, .deadline, .closing-date, .close-date, .response-date').first().text().trim()
+      const postedDate = $(el).find('.posted-date, .post-date, .publish-date, .created-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://sam.gov${link}`
@@ -186,11 +186,11 @@ export async function crawlBonfireHub(query: string): Promise<{ opportunities: P
       }
     }
     
-    $('.opportunity-card, .card, .listing').each((_, el) => {
-      const title = $(el).find('.opportunity-title, .title, h3, h4').first().text().trim()
-      const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.organization, .agency').first().text().trim()
-      const dueDate = $(el).find('.closing-date, .deadline').first().text().trim()
+    $('.opportunity-card, .card, .listing, .result, .item').each((_, el) => {
+      const title = $(el).find('.opportunity-title, .title, h3, h4, h2, .heading').first().text().trim()
+      const link = $(el).find('a[href]').first().attr('href')
+      const organization = $(el).find('.organization, .agency, .entity, .department').first().text().trim()
+      const dueDate = $(el).find('.closing-date, .deadline, .close-date, .response-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://bonfirehub.com${link}`
@@ -276,11 +276,11 @@ export async function crawlPlanetBids(query: string): Promise<{ opportunities: P
       }
     }
     
-    $('.bid-item, .card, .listing').each((_, el) => {
-      const title = $(el).find('.bid-title, .title, h3, h4').first().text().trim()
-      const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.agency, .organization').first().text().trim()
-      const dueDate = $(el).find('.due-date, .deadline').first().text().trim()
+    $('.bid-item, .card, .listing, .result, .item, .opportunity').each((_, el) => {
+      const title = $(el).find('.bid-title, .title, h3, h4, h2, .heading').first().text().trim()
+      const link = $(el).find('a[href]').first().attr('href')
+      const organization = $(el).find('.agency, .organization, .entity, .department').first().text().trim()
+      const dueDate = $(el).find('.due-date, .deadline, .close-date, .response-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://planetbids.com${link}`
@@ -366,11 +366,11 @@ export async function crawlIonWave(query: string): Promise<{ opportunities: Proc
       }
     }
     
-    $('.solicitation-item, .card, .listing').each((_, el) => {
-      const title = $(el).find('.solicitation-title, .title, h3, h4').first().text().trim()
-      const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.entity, .agency, .organization').first().text().trim()
-      const dueDate = $(el).find('.close-date, .deadline').first().text().trim()
+    $('.solicitation-item, .card, .listing, .result, .item, .opportunity').each((_, el) => {
+      const title = $(el).find('.solicitation-title, .title, h3, h4, h2, .heading').first().text().trim()
+      const link = $(el).find('a[href]').first().attr('href')
+      const organization = $(el).find('.entity, .agency, .organization, .department').first().text().trim()
+      const dueDate = $(el).find('.close-date, .deadline, .due-date, .response-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://ionwave.net${link}`
@@ -456,11 +456,11 @@ export async function crawlBidNetDirect(query: string): Promise<{ opportunities:
       }
     }
     
-    $('.opportunity, .card, .listing').each((_, el) => {
-      const title = $(el).find('.opp-title, .title, h3, h4').first().text().trim()
-      const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.agency, .organization').first().text().trim()
-      const dueDate = $(el).find('.deadline, .due-date').first().text().trim()
+    $('.opportunity, .card, .listing, .result, .item, .bid-item').each((_, el) => {
+      const title = $(el).find('.opp-title, .title, h3, h4, h2, .heading').first().text().trim()
+      const link = $(el).find('a[href]').first().attr('href')
+      const organization = $(el).find('.agency, .organization, .entity, .department').first().text().trim()
+      const dueDate = $(el).find('.deadline, .due-date, .close-date, .response-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://bidnetdirect.com${link}`
