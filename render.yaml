@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: contact-intelligence
+    name: ultra-search-browser
     runtime: node
     plan: starter
     buildCommand: npm install && npm run build
@@ -12,3 +12,7 @@ services:
         value: "1"
       - key: DATABASE_URL
         sync: false
+      - key: ENABLE_LOCAL_EMBEDDINGS
+        value: "false"
+      - key: ENABLE_OCR
+        value: "false"
