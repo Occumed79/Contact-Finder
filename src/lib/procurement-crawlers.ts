@@ -3,6 +3,16 @@ import type { ScrapedResult } from '../types/search'
 
 // ─── SPECIALIZED PROCUREMENT CRAWLERS ───
 
+export type CrawlerStatus = 'success' | 'timeout' | 'blocked' | 'error' | 'empty'
+
+export interface CrawlerDiagnostics {
+  source: string
+  status: CrawlerStatus
+  resultsCount: number
+  error?: string
+  latency?: number
+}
+
 export interface ProcurementOpportunity {
   id: string
   title: string
@@ -45,23 +55,50 @@ async function fetchWithTimeout(url: string, timeout = 10000): Promise<Response>
 /**
  * Crawl SAM.gov for federal procurement opportunities
  */
-export async function crawlSAMGov(query: string): Promise<ProcurementOpportunity[]> {
+export async function crawlSAMGov(query: string): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics }> {
   const opportunities: ProcurementOpportunity[] = []
+  const startTime = Date.now()
   
   try {
     const searchUrl = `https://sam.gov/search/?keywords=${encodeURIComponent(query)}&index=opp&pageSize=10`
     const res = await fetchWithTimeout(searchUrl)
-    if (!res.ok) return opportunities
+    
+    if (!res.ok) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'SAM.gov',
+          status: res.status === 403 || res.status === 429 ? 'blocked' : 'error',
+          resultsCount: 0,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+          latency: Date.now() - startTime,
+        },
+      }
+    }
     
     const html = await res.text()
     const $ = cheerio.load(html)
     
-    $('.usa-card').each((_, el) => {
-      const title = $(el).find('.usa-card__heading').first().text().trim()
+    // Check for blocked/limited content
+    if (html.includes('Access Denied') || html.includes('captcha') || html.includes('bot detection')) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'SAM.gov',
+          status: 'blocked',
+          resultsCount: 0,
+          error: 'Blocked by bot detection or access control',
+          latency: Date.now() - startTime,
+        },
+      }
+    }
+    
+    $('.usa-card, .solicitation-card, .card').each((_, el) => {
+      const title = $(el).find('.usa-card__heading, .title, h3, h4').first().text().trim()
       const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.org-name').first().text().trim()
-      const dueDate = $(el).find('.due-date').first().text().trim()
-      const postedDate = $(el).find('.posted-date').first().text().trim()
+      const organization = $(el).find('.org-name, .agency, .organization').first().text().trim()
+      const dueDate = $(el).find('.due-date, .deadline, .closing-date').first().text().trim()
+      const postedDate = $(el).find('.posted-date, .post-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://sam.gov${link}`
@@ -85,32 +122,75 @@ export async function crawlSAMGov(query: string): Promise<ProcurementOpportunity
         })
       }
     })
+    
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'SAM.gov',
+        status: opportunities.length > 0 ? 'success' : 'empty',
+        resultsCount: opportunities.length,
+        latency: Date.now() - startTime,
+      },
+    }
   } catch (err) {
-    console.warn('SAM.gov crawl failed:', err)
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'SAM.gov',
+        status: 'error',
+        resultsCount: 0,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        latency: Date.now() - startTime,
+      },
+    }
   }
-  
-  return opportunities
 }
 
 /**
  * Crawl BonfireHub for procurement opportunities
  */
-export async function crawlBonfireHub(query: string): Promise<ProcurementOpportunity[]> {
+export async function crawlBonfireHub(query: string): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics }> {
   const opportunities: ProcurementOpportunity[] = []
+  const startTime = Date.now()
   
   try {
     const searchUrl = `https://bonfirehub.com/public/?q=${encodeURIComponent(query)}`
     const res = await fetchWithTimeout(searchUrl)
-    if (!res.ok) return opportunities
+    
+    if (!res.ok) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'BonfireHub',
+          status: res.status === 403 || res.status === 429 ? 'blocked' : 'error',
+          resultsCount: 0,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+          latency: Date.now() - startTime,
+        },
+      }
+    }
     
     const html = await res.text()
     const $ = cheerio.load(html)
     
-    $('.opportunity-card').each((_, el) => {
-      const title = $(el).find('.opportunity-title').first().text().trim()
+    if (html.includes('Access Denied') || html.includes('captcha') || html.includes('bot detection')) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'BonfireHub',
+          status: 'blocked',
+          resultsCount: 0,
+          error: 'Blocked by bot detection or access control',
+          latency: Date.now() - startTime,
+        },
+      }
+    }
+    
+    $('.opportunity-card, .card, .listing').each((_, el) => {
+      const title = $(el).find('.opportunity-title, .title, h3, h4').first().text().trim()
       const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.organization').first().text().trim()
-      const dueDate = $(el).find('.closing-date').first().text().trim()
+      const organization = $(el).find('.organization, .agency').first().text().trim()
+      const dueDate = $(el).find('.closing-date, .deadline').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://bonfirehub.com${link}`
@@ -132,32 +212,75 @@ export async function crawlBonfireHub(query: string): Promise<ProcurementOpportu
         })
       }
     })
+    
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'BonfireHub',
+        status: opportunities.length > 0 ? 'success' : 'empty',
+        resultsCount: opportunities.length,
+        latency: Date.now() - startTime,
+      },
+    }
   } catch (err) {
-    console.warn('BonfireHub crawl failed:', err)
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'BonfireHub',
+        status: 'error',
+        resultsCount: 0,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        latency: Date.now() - startTime,
+      },
+    }
   }
-  
-  return opportunities
 }
 
 /**
  * Crawl PlanetBids for procurement opportunities
  */
-export async function crawlPlanetBids(query: string): Promise<ProcurementOpportunity[]> {
+export async function crawlPlanetBids(query: string): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics }> {
   const opportunities: ProcurementOpportunity[] = []
+  const startTime = Date.now()
   
   try {
     const searchUrl = `https://planetbids.com/search?q=${encodeURIComponent(query)}`
     const res = await fetchWithTimeout(searchUrl)
-    if (!res.ok) return opportunities
+    
+    if (!res.ok) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'PlanetBids',
+          status: res.status === 403 || res.status === 429 ? 'blocked' : 'error',
+          resultsCount: 0,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+          latency: Date.now() - startTime,
+        },
+      }
+    }
     
     const html = await res.text()
     const $ = cheerio.load(html)
     
-    $('.bid-item').each((_, el) => {
-      const title = $(el).find('.bid-title').first().text().trim()
+    if (html.includes('Access Denied') || html.includes('captcha') || html.includes('bot detection')) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'PlanetBids',
+          status: 'blocked',
+          resultsCount: 0,
+          error: 'Blocked by bot detection or access control',
+          latency: Date.now() - startTime,
+        },
+      }
+    }
+    
+    $('.bid-item, .card, .listing').each((_, el) => {
+      const title = $(el).find('.bid-title, .title, h3, h4').first().text().trim()
       const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.agency').first().text().trim()
-      const dueDate = $(el).find('.due-date').first().text().trim()
+      const organization = $(el).find('.agency, .organization').first().text().trim()
+      const dueDate = $(el).find('.due-date, .deadline').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://planetbids.com${link}`
@@ -179,32 +302,75 @@ export async function crawlPlanetBids(query: string): Promise<ProcurementOpportu
         })
       }
     })
+    
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'PlanetBids',
+        status: opportunities.length > 0 ? 'success' : 'empty',
+        resultsCount: opportunities.length,
+        latency: Date.now() - startTime,
+      },
+    }
   } catch (err) {
-    console.warn('PlanetBids crawl failed:', err)
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'PlanetBids',
+        status: 'error',
+        resultsCount: 0,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        latency: Date.now() - startTime,
+      },
+    }
   }
-  
-  return opportunities
 }
 
 /**
  * Crawl IonWave for procurement opportunities
  */
-export async function crawlIonWave(query: string): Promise<ProcurementOpportunity[]> {
+export async function crawlIonWave(query: string): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics }> {
   const opportunities: ProcurementOpportunity[] = []
+  const startTime = Date.now()
   
   try {
     const searchUrl = `https://ionwave.net/search?q=${encodeURIComponent(query)}`
     const res = await fetchWithTimeout(searchUrl)
-    if (!res.ok) return opportunities
+    
+    if (!res.ok) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'IonWave',
+          status: res.status === 403 || res.status === 429 ? 'blocked' : 'error',
+          resultsCount: 0,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+          latency: Date.now() - startTime,
+        },
+      }
+    }
     
     const html = await res.text()
     const $ = cheerio.load(html)
     
-    $('.solicitation-item').each((_, el) => {
-      const title = $(el).find('.solicitation-title').first().text().trim()
+    if (html.includes('Access Denied') || html.includes('captcha') || html.includes('bot detection')) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'IonWave',
+          status: 'blocked',
+          resultsCount: 0,
+          error: 'Blocked by bot detection or access control',
+          latency: Date.now() - startTime,
+        },
+      }
+    }
+    
+    $('.solicitation-item, .card, .listing').each((_, el) => {
+      const title = $(el).find('.solicitation-title, .title, h3, h4').first().text().trim()
       const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.entity').first().text().trim()
-      const dueDate = $(el).find('.close-date').first().text().trim()
+      const organization = $(el).find('.entity, .agency, .organization').first().text().trim()
+      const dueDate = $(el).find('.close-date, .deadline').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://ionwave.net${link}`
@@ -226,32 +392,75 @@ export async function crawlIonWave(query: string): Promise<ProcurementOpportunit
         })
       }
     })
+    
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'IonWave',
+        status: opportunities.length > 0 ? 'success' : 'empty',
+        resultsCount: opportunities.length,
+        latency: Date.now() - startTime,
+      },
+    }
   } catch (err) {
-    console.warn('IonWave crawl failed:', err)
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'IonWave',
+        status: 'error',
+        resultsCount: 0,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        latency: Date.now() - startTime,
+      },
+    }
   }
-  
-  return opportunities
 }
 
 /**
  * Crawl BidNetDirect for procurement opportunities
  */
-export async function crawlBidNetDirect(query: string): Promise<ProcurementOpportunity[]> {
+export async function crawlBidNetDirect(query: string): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics }> {
   const opportunities: ProcurementOpportunity[] = []
+  const startTime = Date.now()
   
   try {
     const searchUrl = `https://bidnetdirect.com/search?q=${encodeURIComponent(query)}`
     const res = await fetchWithTimeout(searchUrl)
-    if (!res.ok) return opportunities
+    
+    if (!res.ok) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'BidNetDirect',
+          status: res.status === 403 || res.status === 429 ? 'blocked' : 'error',
+          resultsCount: 0,
+          error: `HTTP ${res.status}: ${res.statusText}`,
+          latency: Date.now() - startTime,
+        },
+      }
+    }
     
     const html = await res.text()
     const $ = cheerio.load(html)
     
-    $('.opportunity').each((_, el) => {
-      const title = $(el).find('.opp-title').first().text().trim()
+    if (html.includes('Access Denied') || html.includes('captcha') || html.includes('bot detection')) {
+      return {
+        opportunities,
+        diagnostics: {
+          source: 'BidNetDirect',
+          status: 'blocked',
+          resultsCount: 0,
+          error: 'Blocked by bot detection or access control',
+          latency: Date.now() - startTime,
+        },
+      }
+    }
+    
+    $('.opportunity, .card, .listing').each((_, el) => {
+      const title = $(el).find('.opp-title, .title, h3, h4').first().text().trim()
       const link = $(el).find('a').first().attr('href')
-      const organization = $(el).find('.agency').first().text().trim()
-      const dueDate = $(el).find('.deadline').first().text().trim()
+      const organization = $(el).find('.agency, .organization').first().text().trim()
+      const dueDate = $(el).find('.deadline, .due-date').first().text().trim()
       
       if (title && link) {
         const fullUrl = link.startsWith('http') ? link : `https://bidnetdirect.com${link}`
@@ -273,11 +482,28 @@ export async function crawlBidNetDirect(query: string): Promise<ProcurementOppor
         })
       }
     })
+    
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'BidNetDirect',
+        status: opportunities.length > 0 ? 'success' : 'empty',
+        resultsCount: opportunities.length,
+        latency: Date.now() - startTime,
+      },
+    }
   } catch (err) {
-    console.warn('BidNetDirect crawl failed:', err)
+    return {
+      opportunities,
+      diagnostics: {
+        source: 'BidNetDirect',
+        status: 'error',
+        resultsCount: 0,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        latency: Date.now() - startTime,
+      },
+    }
   }
-  
-  return opportunities
 }
 
 /**
@@ -332,8 +558,9 @@ export async function crawlCountyPortals(query: string, county: string): Promise
 export async function crawlAllProcurementSources(
   query: string,
   counties?: string[]
-): Promise<ProcurementOpportunity[]> {
+): Promise<{ opportunities: ProcurementOpportunity[]; diagnostics: CrawlerDiagnostics[] }> {
   const allOpportunities: ProcurementOpportunity[] = []
+  const allDiagnostics: CrawlerDiagnostics[] = []
   
   // Run major procurement portals in parallel
   const [samGov, bonfire, planetBids, ionWave, bidNet] = await Promise.all([
@@ -344,7 +571,8 @@ export async function crawlAllProcurementSources(
     crawlBidNetDirect(query),
   ])
   
-  allOpportunities.push(...samGov, ...bonfire, ...planetBids, ...ionWave, ...bidNet)
+  allOpportunities.push(...samGov.opportunities, ...bonfire.opportunities, ...planetBids.opportunities, ...ionWave.opportunities, ...bidNet.opportunities)
+  allDiagnostics.push(samGov.diagnostics, bonfire.diagnostics, planetBids.diagnostics, ionWave.diagnostics, bidNet.diagnostics)
   
   // Crawl county portals if specified
   if (counties && counties.length > 0) {
@@ -362,7 +590,7 @@ export async function crawlAllProcurementSources(
     return true
   })
   
-  return deduplicated
+  return { opportunities: deduplicated, diagnostics: allDiagnostics }
 }
 
 /**

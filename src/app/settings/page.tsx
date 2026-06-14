@@ -11,6 +11,7 @@ import { useTheme } from "next-themes";
 import { useLocalStorage } from "../../hooks/use-local-storage";
 import { UserSettings, SearchSource } from "../../types/search";
 import { FEATURE_CAPABILITIES, type FeatureStatus } from "../../lib/feature-capabilities";
+import { type CrawlerDiagnostics } from "../../lib/procurement-crawlers";
 
 const defaultSettings: UserSettings = {
   theme: "system",
@@ -260,6 +261,31 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+              
+              <div className="pt-4 border-t">
+                <p className="text-sm font-medium mb-2">Procurement Crawler Status</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Crawler diagnostics are logged to console during procurement searches. Status may vary based on bot detection and site changes.
+                </p>
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-muted-foreground">Success: Crawler returned results</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                    <span className="text-muted-foreground">Empty: Crawler ran but found no results</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    <span className="text-muted-foreground">Blocked: Bot detection or access denied</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span className="text-muted-foreground">Error: Network or parsing failure</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -274,6 +300,7 @@ function StatusBadge({ status }: { status: FeatureStatus }) {
     experimental: { label: "Experimental", variant: "secondary" },
     scaffold: { label: "Scaffold", variant: "outline" },
     planned: { label: "Planned", variant: "outline" },
+    blocked: { label: "Blocked", variant: "destructive" },
   };
   
   const { label, variant } = variants[status];

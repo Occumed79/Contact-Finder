@@ -1,6 +1,6 @@
 // ─── FEATURE CAPABILITY STATUS METADATA ───
 
-export type FeatureStatus = 'active' | 'experimental' | 'scaffold' | 'planned'
+export type FeatureStatus = 'active' | 'experimental' | 'scaffold' | 'planned' | 'blocked'
 
 export interface FeatureCapability {
   id: string
@@ -39,18 +39,18 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
   {
     id: 'document_text_extraction',
     label: 'Document Text Extraction',
-    description: 'HTML text extraction with entity recognition',
-    status: 'scaffold',
+    description: 'HTML and PDF text extraction with entity recognition',
+    status: 'active',
     runtimeEnabled: true,
-    notes: 'HTML extraction with cheerio is functional. PDF/DOCX functions are text-processing scaffolds that assume pre-extracted text.',
+    notes: 'HTML extraction with cheerio is functional. PDF binary parsing with pdf-parse is implemented.',
   },
   {
     id: 'pdf_binary_parsing',
     label: 'PDF Binary Parsing',
-    description: 'Direct binary PDF file parsing without pre-extraction',
-    status: 'planned',
-    runtimeEnabled: false,
-    notes: 'Would require pdf-parse or similar library. Current implementation assumes text is already extracted.',
+    description: 'Direct binary PDF file parsing using pdf-parse',
+    status: 'experimental',
+    runtimeEnabled: true,
+    notes: 'Implemented with pdf-parse library. Extracts text, metadata, and page count from binary PDF files.',
   },
   {
     id: 'ocr',
@@ -66,7 +66,7 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'Federal procurement opportunity crawler for SAM.gov',
     status: 'experimental',
     runtimeEnabled: true,
-    notes: 'Attempts real HTTP fetch with 10s timeout. CSS selectors are generic and may not match actual site structure.',
+    notes: 'Attempts real HTTP fetch with 10s timeout. May be blocked by bot detection. Returns diagnostics.',
   },
   {
     id: 'bonfire_crawler',
@@ -74,7 +74,7 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'Procurement opportunity crawler for BonfireHub',
     status: 'experimental',
     runtimeEnabled: true,
-    notes: 'Attempts real HTTP fetch with 10s timeout. CSS selectors are generic and may not match actual site structure.',
+    notes: 'Attempts real HTTP fetch with 10s timeout. May be blocked by bot detection. Returns diagnostics.',
   },
   {
     id: 'ionwave_crawler',
@@ -82,7 +82,7 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'Procurement opportunity crawler for IonWave',
     status: 'experimental',
     runtimeEnabled: true,
-    notes: 'Attempts real HTTP fetch with 10s timeout. CSS selectors are generic and may not match actual site structure.',
+    notes: 'Attempts real HTTP fetch with 10s timeout. May be blocked by bot detection. Returns diagnostics.',
   },
   {
     id: 'planetbids_crawler',
@@ -90,7 +90,7 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'Procurement opportunity crawler for PlanetBids',
     status: 'experimental',
     runtimeEnabled: true,
-    notes: 'Attempts real HTTP fetch with 10s timeout. CSS selectors are generic and may not match actual site structure.',
+    notes: 'Attempts real HTTP fetch with 10s timeout. May be blocked by bot detection. Returns diagnostics.',
   },
   {
     id: 'bidnet_crawler',
@@ -98,7 +98,7 @@ export const FEATURE_CAPABILITIES: FeatureCapability[] = [
     description: 'Procurement opportunity crawler for BidNetDirect',
     status: 'experimental',
     runtimeEnabled: true,
-    notes: 'Attempts real HTTP fetch with 10s timeout. CSS selectors are generic and may not match actual site structure.',
+    notes: 'Attempts real HTTP fetch with 10s timeout. May be blocked by bot detection. Returns diagnostics.',
   },
 ]
 

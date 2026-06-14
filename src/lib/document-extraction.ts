@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio'
+import pdfParse from 'pdf-parse'
 
 // ─── DOCUMENT EXTRACTION LAYER ───
 
@@ -24,6 +25,13 @@ export interface ExtractedDocument {
     paragraphs: string[]
     tables: string[][]
   }
+}
+
+export interface ExtractionResult {
+  success: boolean
+  document?: ExtractedDocument
+  error?: string
+  source?: string
 }
 
 /**
@@ -98,9 +106,78 @@ export function extractEntities(text: string) {
 }
 
 /**
- * Extract structured data from PDF text (simulated - would use pdf-parse in production)
+ * Extract structured data from PDF binary data using pdf-parse
  */
-export function extractFromPDF(pdfText: string, metadata?: any): ExtractedDocument {
+export async function extractFromPDFBuffer(buffer: Buffer): Promise<ExtractionResult> {
+  try {
+    const data = await pdfParse(buffer)
+    const text = data.text.replace(/\s+/g, ' ').trim()
+    
+    // Try to extract title from first few lines
+    const lines = text.split('\n').filter((l: string) => l.trim())
+    const title = lines[0]?.trim() || undefined
+    
+    // Extract sections based on common patterns
+    const headers: string[] = []
+    const headerPatterns = [
+      /^(?:Chapter|Section|Part)\s+\d+/i,
+      /^[A-Z][A-Z\s]{10,}$/,
+      /^\d+\.\s+[A-Z]/,
+    ]
+    
+    lines.forEach((line: string) => {
+      for (const pattern of headerPatterns) {
+        if (pattern.test(line)) {
+          headers.push(line.trim())
+          break
+        }
+      }
+    })
+    
+    const paragraphs: string[] = []
+    let currentPara = ''
+    lines.forEach((line: string) => {
+      if (line.trim().length === 0) {
+        if (currentPara.length > 50) {
+          paragraphs.push(currentPara.trim())
+          currentPara = ''
+        }
+      } else {
+        currentPara += line + ' '
+      }
+    })
+    if (currentPara.length > 50) paragraphs.push(currentPara.trim())
+    
+    const entities = extractEntities(text)
+    
+    return {
+      success: true,
+      document: {
+        text,
+        title,
+        metadata: {
+          fileType: 'pdf',
+          pageCount: data.numpages,
+          author: data.info?.Author,
+          createdDate: data.info?.CreationDate,
+          modifiedDate: data.info?.ModDate,
+        },
+        entities,
+        sections: { headers, paragraphs, tables: [] },
+      },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'PDF parsing failed',
+    }
+  }
+}
+
+/**
+ * Extract structured data from PDF text (fallback for pre-extracted text)
+ */
+export function extractFromPDFText(pdfText: string, metadata?: any): ExtractedDocument {
   const text = pdfText.replace(/\s+/g, ' ').trim()
   
   // Try to extract title from first few lines
@@ -197,6 +274,58 @@ export function extractFromDOCX(docxContent: string): ExtractedDocument {
 }
 
 /**
+ * Fetch and extract from a URL with timeout
+ */
+export async function fetchAndExtractFromURL(url: string, timeout = 10000): Promise<ExtractionResult> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    
+    if (!res.ok) {
+      return {
+        success: false,
+        error: `HTTP ${res.status}: ${res.statusText}`,
+        source: url,
+      }
+    }
+    
+    const contentType = res.headers.get('content-type') || ''
+    
+    // Handle PDF
+    if (contentType.includes('application/pdf') || url.toLowerCase().endsWith('.pdf')) {
+      const buffer = Buffer.from(await res.arrayBuffer())
+      return await extractFromPDFBuffer(buffer)
+    }
+    
+    // Handle HTML
+    const html = await res.text()
+    const document = extractFromHTML(html)
+    return {
+      success: true,
+      document,
+      source: url,
+    }
+  } catch (err) {
+    clearTimeout(timer)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Fetch failed',
+      source: url,
+    }
+  }
+}
+
+/**
  * Main extraction router
  */
 export async function extractDocument(
@@ -208,7 +337,7 @@ export async function extractDocument(
     case 'html':
       return extractFromHTML(content)
     case 'pdf':
-      return extractFromPDF(content, metadata)
+      return extractFromPDFText(content, metadata)
     case 'docx':
       return extractFromDOCX(content)
     case 'text':

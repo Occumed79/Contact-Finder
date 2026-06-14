@@ -10,8 +10,9 @@ import {
   LENS_CONFIGS,
 } from './intelligence'
 import { extractIntelligence } from './entity-extraction'
-import { crawlAllProcurementSources, procurementToScrapedResult } from './procurement-crawlers'
+import { crawlAllProcurementSources, procurementToScrapedResult, type CrawlerDiagnostics } from './procurement-crawlers'
 import { rerankResults } from './semantic-search'
+import { fetchAndExtractFromURL, type ExtractionResult } from './document-extraction'
 import type { ScrapedResult } from '../types/search'
 
 // Re-export intelligence types for consumers
@@ -246,8 +247,13 @@ export async function searchIntelligence(
     try {
       // Add timeout wrapper for procurement crawler phase
       const procurementPromise = (async () => {
-        const procurementOpportunities = await crawlAllProcurementSources(query)
+        const { opportunities: procurementOpportunities, diagnostics: crawlerDiagnostics } = await crawlAllProcurementSources(query)
         const procurementResults = procurementOpportunities.map(procurementToScrapedResult)
+        
+        // Log crawler diagnostics
+        crawlerDiagnostics.forEach(d => {
+          console.log(`Crawler ${d.source}: ${d.status} (${d.resultsCount} results, ${d.latency}ms)${d.error ? ` - ${d.error}` : ''}`)
+        })
         
         // Enrich with intelligence objects
         const enrichedResults = await Promise.all(
@@ -317,19 +323,39 @@ export async function searchIntelligence(
   // Enrich results with intelligence objects for relevant lenses
   const enrichedResults = await Promise.all(
     semanticallyOrderedResults.map(async (result) => {
-      if (['procurement', 'provider', 'pricing'].includes(lens)) {
+      let content = ''
+      let extractionSource = 'scrape'
+      
+      // Try PDF extraction for PDF, government, and procurement lenses
+      if (['pdf', 'government', 'procurement'].includes(lens) && result.url.toLowerCase().endsWith('.pdf')) {
         try {
-          const content = await scrapeWebsite(result.url)
-          if (content.length > 100) {
-            const intelligence = extractIntelligence(content, result.url, result.title, lens)
-            if (intelligence) {
-              return { ...result, intelligence }
-            }
+          const extractionResult: ExtractionResult = await fetchAndExtractFromURL(result.url, 8000)
+          if (extractionResult.success && extractionResult.document) {
+            content = extractionResult.document.text
+            extractionSource = 'pdf'
           }
+        } catch {
+          // Fall back to regular scraping
+        }
+      }
+      
+      // Regular scraping fallback or for other lenses
+      if (!content && ['procurement', 'provider', 'pricing'].includes(lens)) {
+        try {
+          content = await scrapeWebsite(result.url)
+          extractionSource = 'scrape'
         } catch {
           // If scraping fails, return result without intelligence
         }
       }
+      
+      if (content.length > 100) {
+        const intelligence = extractIntelligence(content, result.url, result.title, lens)
+        if (intelligence) {
+          return { ...result, intelligence, extractionSource }
+        }
+      }
+      
       return result
     })
   )
