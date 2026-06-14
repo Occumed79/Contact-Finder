@@ -5,8 +5,6 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useSearch } from "../hooks/use-search";
 import type { SearchLens, ScrapedResult } from "../types/search";
 
-const OCCUMED_LOGO_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQQAAACOCAYAAADXVHYAAAADc0lEQVR42u3cvW7TUACG4S9tKiTEwAICAAAmhgGrj2UjFOjGZmM0lzWLtxPbZK0Gz8EuxHu2UucmJrD9KIgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAtWq3LhZgpb3rZ2bD9n/7u2AzLzfRhSpgxMN16nPzC/NNfMYbW/1dnTpmdO7+t1c8r+MIQK8Z3jpr1fPG83zR6wC2s3eS0o4fON1XL2CLwSxWfnNOXcCOmPhjU6Gr0wDeUzZq6O0JQG8pG7X0cWO2BPxWvmv9hYAOa/V2cvaEfgU+f3w6XInYL60+ny5E7AfWn2+3AkAZgrZqKGPGwFgo5CBGvq4EQBZqKGPGwGQhRr6uBEAQRr6uBEAJRr6uBEAYRr6uBEAgRr6uBEAQRr6uBEAARr6uBEAABr6uBEAwBq6nn4XAIDlbDTc6Oq6AOBwNhpu1E4AMMIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgGXKO+zFlcXkgw2Wsu7cUuVbZcx8EcC/r5iJN/7l0wBapbbuae05ERhzfOezf70z4HYCLH/7I5Zz4MpHM31Zp9fB7+sBxLtB9oof58gNq4mAEXFjDH9cCAN9qgkz3ivYBGPbJcY0fA2CDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADMDnCdeVmNpbdXAAAAAElFTkSuQmCC";
-
 const LENSES: { id: SearchLens; label: string }[] = [
   { id: "web", label: "Web" },
   { id: "pdf", label: "PDF" },
@@ -151,7 +149,11 @@ export default function Home() {
         <header className="floating-header">
           <a className="logo-dock" href="/" aria-label="Ultra Search home">
             <span className="logo-halo" />
-            <img src={OCCUMED_LOGO_SRC} alt="Occu-Med" />
+            <span className="om-mark" aria-hidden="true">
+              <span className="om-leaf om-left" />
+              <span className="om-leaf om-right" />
+            </span>
+            <span className="om-wordmark">OCCU-MED</span>
           </a>
 
           <nav className="floating-actions" aria-label="App navigation">
@@ -161,18 +163,18 @@ export default function Home() {
           </nav>
         </header>
 
-        <section className="search-stage liquid-glass">
-          <div className="lens-cluster" aria-label="Search lenses">
-            <div className="lens-cluster-label">Lens</div>
-            <div className="lens-cluster-grid">
-              {LENSES.map((item) => (
-                <button key={item.id} type="button" onClick={() => setLens(item.id)} className={lens === item.id ? "lens-dot active" : "lens-dot"}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
+        <aside className="lens-cluster" aria-label="Search lenses">
+          <div className="lens-cluster-label">Lens</div>
+          <div className="lens-cluster-grid">
+            {LENSES.map((item) => (
+              <button key={item.id} type="button" onClick={() => setLens(item.id)} className={lens === item.id ? "lens-dot active" : "lens-dot"}>
+                {item.label}
+              </button>
+            ))}
           </div>
+        </aside>
 
+        <section className="search-stage liquid-glass">
           <form className="search-bar" onSubmit={submitSearch}>
             <Search className="search-icon" aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search anything..." aria-label="Search query" autoFocus />
