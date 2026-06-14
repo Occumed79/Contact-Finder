@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard, Cpu } from "lucide-react";
+import { Settings, Moon, Sun, Monitor, Eye, Globe, Zap, Keyboard, Cpu, Database } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Switch } from "../../components/ui/switch";
@@ -283,6 +283,58 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-gray-500"></div>
                     <span className="text-muted-foreground">Error: Network or parsing failure</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Database Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Database Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">DATABASE_URL</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  PostgreSQL connection string for pgvector integration. Leave empty to use local in-memory vector store only.
+                </p>
+                <input
+                  type="password"
+                  placeholder="postgresql://user:password@host:port/database"
+                  className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                  defaultValue={typeof window !== 'undefined' ? (window as any).DATABASE_URL || '' : ''}
+                  onChange={(e) => {
+                    // This would need to be stored in environment variables or a secure storage
+                    // For now, this is a placeholder for the UI
+                    console.log('DATABASE_URL changed:', e.target.value)
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Set this as an environment variable on your deployment platform (e.g., Render, Vercel).
+                </p>
+              </div>
+              <div className="pt-4 border-t">
+                <p className="text-sm font-medium mb-2">pgvector Status</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  When DATABASE_URL is configured, the app will automatically initialize the pgvector extension and schema on first use.
+                </p>
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-muted-foreground">Automatic schema initialization</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-muted-foreground">Vector similarity search with cosine distance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-muted-foreground">Persistent document storage</span>
                   </div>
                 </div>
               </div>

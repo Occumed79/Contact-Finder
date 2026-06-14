@@ -9,7 +9,7 @@ import { Badge } from "../components/ui/badge";
 import { Header } from "../components/header";
 import { SearchBar } from "../components/search-bar";
 import { useSearch } from "../hooks/use-search";
-import { type SearchLens, type ScrapedResult, type ProcurementIntelligence, type ProviderIntelligence, type PricingIntelligence } from "../types/search";
+import { type SearchLens, type ScrapedResult, type ProcurementIntelligence, type ProviderIntelligence, type PricingIntelligence, type LegalIntelligence, type MedicalIntelligence, type AcademicIntelligence, type FinancialIntelligence } from "../types/search";
 
 const LENSES: { id: SearchLens; label: string; icon: typeof Search }[] = [
   { id: "web", label: "Web", icon: Search },
@@ -279,6 +279,18 @@ function SearchResultCard({ result, index }: { result: ScrapedResult; index: num
               {isPricingIntelligence(result.intelligence) && (
                 <PricingCard intelligence={result.intelligence} />
               )}
+              {isLegalIntelligence(result.intelligence) && (
+                <LegalCard intelligence={result.intelligence} />
+              )}
+              {isMedicalIntelligence(result.intelligence) && (
+                <MedicalCard intelligence={result.intelligence} />
+              )}
+              {isAcademicIntelligence(result.intelligence) && (
+                <AcademicCard intelligence={result.intelligence} />
+              )}
+              {isFinancialIntelligence(result.intelligence) && (
+                <FinancialCard intelligence={result.intelligence} />
+              )}
             </div>
           )}
 
@@ -312,6 +324,22 @@ function isProviderIntelligence(obj: any): obj is ProviderIntelligence {
 
 function isPricingIntelligence(obj: any): obj is PricingIntelligence {
   return obj && 'service' in obj && 'price_cash' in obj
+}
+
+function isLegalIntelligence(obj: any): obj is LegalIntelligence {
+  return obj && 'legal_type' in obj
+}
+
+function isMedicalIntelligence(obj: any): obj is MedicalIntelligence {
+  return obj && 'medical_type' in obj
+}
+
+function isAcademicIntelligence(obj: any): obj is AcademicIntelligence {
+  return obj && 'academic_type' in obj
+}
+
+function isFinancialIntelligence(obj: any): obj is FinancialIntelligence {
+  return obj && 'financial_type' in obj
 }
 
 // Intelligence Card Components
@@ -427,6 +455,159 @@ function PricingCard({ intelligence }: { intelligence: PricingIntelligence }) {
             </Badge>
           ))}
         </div>
+      )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckCircle className="h-3 w-3" />
+        Confidence: {intelligence.source_confidence}%
+      </div>
+    </div>
+  )
+}
+
+function LegalCard({ intelligence }: { intelligence: LegalIntelligence }) {
+  return (
+    <div className="space-y-2">
+      {intelligence.legal_type && (
+        <Badge variant="outline" className="text-xs">
+          {intelligence.legal_type}
+        </Badge>
+      )}
+      {intelligence.case_name && (
+        <div className="text-sm font-medium">{intelligence.case_name}</div>
+      )}
+      {intelligence.court && (
+        <div className="text-xs text-muted-foreground">Court: {intelligence.court}</div>
+      )}
+      {intelligence.citation && (
+        <div className="text-xs text-muted-foreground">Citation: {intelligence.citation}</div>
+      )}
+      {intelligence.decision_date && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          {intelligence.decision_date}
+        </div>
+      )}
+      {intelligence.statute_name && (
+        <div className="text-xs text-muted-foreground">Statute: {intelligence.statute_name}</div>
+      )}
+      {intelligence.regulation_number && (
+        <div className="text-xs text-muted-foreground">Regulation: {intelligence.regulation_number}</div>
+      )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckCircle className="h-3 w-3" />
+        Confidence: {intelligence.source_confidence}%
+      </div>
+    </div>
+  )
+}
+
+function MedicalCard({ intelligence }: { intelligence: MedicalIntelligence }) {
+  return (
+    <div className="space-y-2">
+      {intelligence.medical_type && (
+        <Badge variant="outline" className="text-xs">
+          {intelligence.medical_type}
+        </Badge>
+      )}
+      {intelligence.condition && (
+        <div className="text-sm font-medium">{intelligence.condition}</div>
+      )}
+      {intelligence.treatment && (
+        <div className="text-xs text-muted-foreground">Treatment: {intelligence.treatment}</div>
+      )}
+      {intelligence.diagnosis && (
+        <div className="text-xs text-muted-foreground">Diagnosis: {intelligence.diagnosis}</div>
+      )}
+      {intelligence.clinical_trial_id && (
+        <div className="text-xs text-muted-foreground">Trial ID: {intelligence.clinical_trial_id}</div>
+      )}
+      {intelligence.publication_date && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          {intelligence.publication_date}
+        </div>
+      )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckCircle className="h-3 w-3" />
+        Confidence: {intelligence.source_confidence}%
+      </div>
+    </div>
+  )
+}
+
+function AcademicCard({ intelligence }: { intelligence: AcademicIntelligence }) {
+  return (
+    <div className="space-y-2">
+      {intelligence.academic_type && (
+        <Badge variant="outline" className="text-xs">
+          {intelligence.academic_type}
+        </Badge>
+      )}
+      {intelligence.paper_title && (
+        <div className="text-sm font-medium">{intelligence.paper_title}</div>
+      )}
+      {intelligence.journal && (
+        <div className="text-xs text-muted-foreground">Journal: {intelligence.journal}</div>
+      )}
+      {intelligence.authors && intelligence.authors.length > 0 && (
+        <div className="text-xs text-muted-foreground">
+          Authors: {intelligence.authors.slice(0, 3).join(', ')}
+          {intelligence.authors.length > 3 && ' et al.'}
+        </div>
+      )}
+      {intelligence.doi && (
+        <div className="text-xs text-muted-foreground">DOI: {intelligence.doi}</div>
+      )}
+      {intelligence.citation_count && (
+        <div className="text-xs text-muted-foreground">Citations: {intelligence.citation_count}</div>
+      )}
+      {intelligence.publication_date && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          {intelligence.publication_date}
+        </div>
+      )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckCircle className="h-3 w-3" />
+        Confidence: {intelligence.source_confidence}%
+      </div>
+    </div>
+  )
+}
+
+function FinancialCard({ intelligence }: { intelligence: FinancialIntelligence }) {
+  return (
+    <div className="space-y-2">
+      {intelligence.financial_type && (
+        <Badge variant="outline" className="text-xs">
+          {intelligence.financial_type}
+        </Badge>
+      )}
+      {intelligence.company_name && (
+        <div className="text-sm font-medium">{intelligence.company_name}</div>
+      )}
+      {intelligence.ticker && (
+        <Badge variant="secondary" className="text-xs">
+          {intelligence.ticker}
+        </Badge>
+      )}
+      {intelligence.revenue && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <DollarSign className="h-3 w-3" />
+          Revenue: {intelligence.revenue}
+        </div>
+      )}
+      {intelligence.profit && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <DollarSign className="h-3 w-3" />
+          Profit: {intelligence.profit}
+        </div>
+      )}
+      {intelligence.eps && (
+        <div className="text-xs text-muted-foreground">EPS: {intelligence.eps}</div>
+      )}
+      {intelligence.reporting_period && (
+        <div className="text-xs text-muted-foreground">Period: {intelligence.reporting_period}</div>
       )}
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <CheckCircle className="h-3 w-3" />
