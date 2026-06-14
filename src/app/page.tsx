@@ -33,11 +33,11 @@ import type { SearchLens, ScrapedResult } from "../types/search";
 const LENSES: { id: SearchLens; label: string; icon: LucideIcon }[] = [
   { id: "web", label: "Web", icon: Search },
   { id: "pdf", label: "PDF", icon: FileText },
-  { id: "government", label: "Government", icon: Building2 },
-  { id: "procurement", label: "Procurement", icon: Database },
+  { id: "government", label: "Gov", icon: Building2 },
+  { id: "procurement", label: "RFP", icon: Database },
   { id: "pricing", label: "Pricing", icon: Zap },
   { id: "provider", label: "Provider", icon: Stethoscope },
-  { id: "technical", label: "Technical", icon: Code },
+  { id: "technical", label: "Tech", icon: Code },
   { id: "news", label: "News", icon: Newspaper },
   { id: "legal", label: "Legal", icon: Scale },
   { id: "medical", label: "Medical", icon: Stethoscope },
@@ -48,18 +48,18 @@ const LENSES: { id: SearchLens; label: string; icon: LucideIcon }[] = [
 const FEATURE_CARDS = [
   {
     icon: Activity,
-    title: "Multi-engine aggregation",
-    text: "Blends DuckDuckGo, Bing, Google, and optional search backbones into one ranked result stream.",
+    title: "Multi-engine search",
+    text: "DuckDuckGo, Bing, Google, and optional backbones in one ranked stream.",
   },
   {
     icon: Sparkles,
     title: "Query intelligence",
-    text: "Expands searches with lens-specific terms, operators, and intent signals before ranking.",
+    text: "Lens-aware expansion for RFPs, providers, pricing, PDFs, and technical searches.",
   },
   {
     icon: ArrowUpDown,
     title: "Signal scoring",
-    text: "Boosts useful sources, structured opportunities, PDFs, government domains, and provider signals.",
+    text: "Boosts useful sources, government portals, documents, and structured matches.",
   },
 ];
 
@@ -195,7 +195,6 @@ export default function Home() {
       <div className="liquid-grid" aria-hidden="true" />
       <div className="liquid-orb orb-one" aria-hidden="true" />
       <div className="liquid-orb orb-two" aria-hidden="true" />
-      <div className="liquid-orb orb-three" aria-hidden="true" />
       <div className="liquid-sweep" aria-hidden="true" />
 
       <section className="liquid-shell">
@@ -205,9 +204,7 @@ export default function Home() {
               <Search className="brand-search" aria-hidden="true" />
               <Zap className="brand-zap" aria-hidden="true" />
             </span>
-            <span>
-              <strong>Ultra</strong>Search
-            </span>
+            <span><strong>Ultra</strong>Search</span>
           </a>
 
           <nav className="liquid-nav" aria-label="App navigation">
@@ -217,17 +214,21 @@ export default function Home() {
           </nav>
         </header>
 
-        <section className="liquid-hero">
-          <p className="eyebrow"><span /> Kagi-style browser intelligence without API keys</p>
-          <h1>
-            Search through a <em>liquid glass</em> command surface.
-          </h1>
-          <p className="hero-copy">
-            Multi-engine aggregation, query expansion, structured signals, document extraction, and scoring wrapped in a dark luminous macOS-style interface.
-          </p>
-        </section>
+        <section className="app-workspace liquid-glass">
+          <div className="workspace-header">
+            <div>
+              <p className="eyebrow"><span /> Live browser intelligence</p>
+              <h1>Ultra Search</h1>
+              <p className="hero-copy">
+                Search RFPs, providers, pricing, documents, and web results from one clean glass workspace.
+              </p>
+            </div>
+            <div className="workspace-status" aria-label="Runtime status">
+              <span className="status-dot" />
+              No API keys required
+            </div>
+          </div>
 
-        <section className="liquid-command liquid-glass">
           <div className="lens-ribbon" aria-label="Search lenses">
             {LENSES.map((item) => {
               const Icon = item.icon;
@@ -266,11 +267,7 @@ export default function Home() {
           {suggestions.length > 0 && query && !hasSearched && (
             <div className="suggestion-row">
               {suggestions.slice(0, 4).map((suggestion) => (
-                <button
-                  type="button"
-                  key={suggestion.text}
-                  onClick={() => setQuery(suggestion.text)}
-                >
+                <button type="button" key={suggestion.text} onClick={() => setQuery(suggestion.text)}>
                   {suggestion.text}
                 </button>
               ))}
@@ -307,9 +304,7 @@ export default function Home() {
                   <Filter aria-hidden="true" />
                   <select value={filterSource} onChange={(event) => setFilterSource(event.target.value)}>
                     <option value="">All sources</option>
-                    {sources.map((source) => (
-                      <option value={source} key={source}>{source}</option>
-                    ))}
+                    {sources.map((source) => <option value={source} key={source}>{source}</option>)}
                   </select>
                 </label>
 
@@ -346,11 +341,7 @@ export default function Home() {
                 {intelligence.queryExpansions.length > 0 && (
                   <div className="intel-chips">
                     {intelligence.queryExpansions.slice(0, 8).map((expansion) => (
-                      <button
-                        type="button"
-                        key={expansion}
-                        onClick={() => setQuery(expansion)}
-                      >
+                      <button type="button" key={expansion} onClick={() => setQuery(expansion)}>
                         {expansion}
                       </button>
                     ))}
