@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchIntelligence, generateMockResults, type Vertical } from "../../../lib/search";
+import { multiDimensionSearch } from "../../../lib/scrapers/orchestrator";
+import { generateMockIntelligence, expandQuery, scoreSignals, calculateConfidence, buildIntelligenceObject, type Vertical } from "../../../lib/intelligence";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,22 +11,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
+    const targetVertical = vertical || 'contact';
+
     try {
-      const result = await searchIntelligence(query, vertical);
-      return NextResponse.json(result);
-    } catch (err) {
-      console.warn("Intelligence search failed, falling back to mock:", err);
-      const mock = generateMockResults(query);
+      // Run multi-dimensional search
+      const multiResult = await multiDimensionSearch(query, targetVertical);
+
+      // If we got real contacts, build intelligence object
+      if (multiResult.contacts.length > 0) {
+        const expanded = expandQuery(query, targetVertical);
+        const allText = multiResult.rawTexts.join(' ');
+        const signals = scoreSignals(allText);
+
+        const intelligenceObject = buildIntelligenceObject(
+          query,
+          expanded,
+          multiResult.contacts,
+          multiResult.sources,
+          multiResult.rawTexts,
+          undefined
+        );
+
+        // Add method breakdown to response for transparency
+        return NextResponse.json({
+          ...intelligenceObject,
+          methodBreakdown: multiResult.methodBreakdown,
+          totalMethodsAttempted: multiResult.totalMethodsAttempted,
+          successfulMethods: multiResult.successfulMethods,
+        });
+      }
+
+      // If no contacts found, fall back to mock intelligence
+      console.warn("Multi-dimensional search found no contacts, falling back to mock");
+      const mockResult = generateMockIntelligence(query, targetVertical);
       return NextResponse.json({
-        organization: mock.organization,
-        vertical: vertical || "contact",
-        confidence: Math.round(mock.contacts.reduce((a, c) => a + c.confidence, 0) / mock.contacts.length),
-        contacts: mock.contacts,
-        signals: [],
-        sources: mock.sources,
-        queryExpansions: [],
-        timestamp: mock.timestamp,
-        note: "Search engines unavailable. Showing generated data.",
+        ...mockResult,
+        methodBreakdown: multiResult.methodBreakdown,
+        totalMethodsAttempted: multiResult.totalMethodsAttempted,
+        successfulMethods: multiResult.successfulMethods,
+        note: "No real contacts found. Showing demonstration data.",
+      });
+    } catch (err) {
+      console.error("Multi-dimensional search failed:", err);
+      // Final fallback to mock
+      const mockResult = generateMockIntelligence(query, targetVertical);
+      return NextResponse.json({
+        ...mockResult,
+        note: "All search methods failed. Showing demonstration data.",
       });
     }
   } catch (error) {
