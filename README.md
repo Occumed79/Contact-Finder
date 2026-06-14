@@ -24,12 +24,13 @@ A Kagi-style broad search browser with multi-engine aggregation, query intellige
 - **pgvector Retrieval**: PostgreSQL pgvector integration with pg library (requires DATABASE_URL and pgvector extension)
 - **Intelligence Object Extraction**: Automatic extraction of structured data for procurement, provider, pricing, legal, medical, academic, and financial lenses
 - **Vector Storage**: Local in-memory adapter and PostgreSQL pgvector adapter for semantic search
+- **Procurement Search**: Web search with procurement-focused query expansion (RFP, RFQ, bid, solicitation, site:.gov, site:.us, PDF) and ranking boosts for government domains and procurement terms
+- **Government/PDF Ranking Boosts**: Automatic ranking boosts for .gov domains (+50), .us domains (+30), PDF files (+40), and procurement terms (+25)
 
 ### Experimental (Requires explicit opt-in via environment variables)
 - **Local Embedding Model**: @xenova/transformers with Xenova/all-MiniLM-L6-v2 (requires `ENABLE_LOCAL_EMBEDDINGS=true`, 60s timeout, falls back to hash-based embeddings)
 - **OCR (Optical Character Recognition)**: Text extraction from images using Tesseract.js (requires `ENABLE_OCR=true`, 30s timeout, disabled by default due to performance impact)
 - **Local Pseudo-Vector Reranking**: Hash-based TF-IDF vector approximation for semantic similarity (in-memory, not production-grade embeddings)
-- **Procurement Crawlers**: HTTP fetch adapters for SAM.gov, BonfireHub, IonWave, PlanetBids, BidNetDirect with improved CSS selectors and diagnostics
 
 *See Settings → Advanced Features for current capability status and runtime notes.*
 

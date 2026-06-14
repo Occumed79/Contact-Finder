@@ -3,7 +3,6 @@
 // Tests core procurement/PDF/government/pricing/provider search functionality
 
 import { searchIntelligence } from '../src/lib/search'
-import { crawlAllProcurementSources } from '../src/lib/procurement-crawlers'
 
 interface TestResult {
   query: string
@@ -14,7 +13,6 @@ interface TestResult {
   urlsAreReal: boolean
   pdfExtractionHappened: boolean
   intelligenceObjectsPopulated: boolean
-  crawlerDiagnostics?: any
   cacheHitMiss?: string
   fallbackWebSearchUsed: boolean
   extractionDiagnostics: Array<{
@@ -91,17 +89,6 @@ async function runSmokeTest(): Promise<void> {
         }
       })
 
-      // Get crawler diagnostics if procurement lens
-      let crawlerDiagnostics
-      if (test.lens === 'procurement') {
-        try {
-          const { diagnostics } = await crawlAllProcurementSources(test.query)
-          crawlerDiagnostics = diagnostics
-        } catch (e) {
-          errors.push(`Crawler error: ${e instanceof Error ? e.message : String(e)}`)
-        }
-      }
-
       // Get top 5 results
       const topResults = searchResults.slice(0, 5).map(r => ({
         title: r.title,
@@ -119,8 +106,8 @@ async function runSmokeTest(): Promise<void> {
       if (test.lens === 'pricing' && !intelligenceObjectsPopulated && searchResults.length > 0) {
         errors.push('Pricing lens returned results but no pricing intelligence objects populated')
       }
-      if (test.lens === 'procurement' && searchResults.length === 0 && crawlerDiagnostics && crawlerDiagnostics.some(d => d.status === 'success' || d.status === 'empty')) {
-        errors.push('Procurement lens returned 0 results but crawlers reported success/empty')
+      if (test.lens === 'procurement' && searchResults.length === 0) {
+        errors.push('Procurement lens returned 0 results - web search fallback failed')
       }
 
       results.push({
@@ -132,7 +119,6 @@ async function runSmokeTest(): Promise<void> {
         urlsAreReal,
         pdfExtractionHappened,
         intelligenceObjectsPopulated,
-        crawlerDiagnostics,
         fallbackWebSearchUsed,
         extractionDiagnostics,
         errors,
@@ -218,24 +204,17 @@ async function runSmokeTest(): Promise<void> {
     console.log()
   })
 
-  // Crawler diagnostics summary
-  console.log('=== CRAWLER DIAGNOSTICS ===')
+  // Procurement search diagnostics summary
+  console.log('=== PROCUREMENT SEARCH DIAGNOSTICS ===')
   const procurementTests = results.filter(r => r.lens === 'procurement')
   if (procurementTests.length > 0) {
     for (const test of procurementTests) {
-      if (test.crawlerDiagnostics) {
-        console.log(`Query: ${test.query}`)
-        for (const diag of test.crawlerDiagnostics) {
-          console.log(`  ${diag.source}:`)
-          console.log(`    Status: ${diag.status}`)
-          console.log(`    Results: ${diag.resultsCount}`)
-          console.log(`    Latency: ${diag.latency}ms`)
-          if (diag.error) {
-            console.log(`    Error: ${diag.error}`)
-          }
-        }
-        console.log()
-      }
+      console.log(`Query: ${test.query}`)
+      console.log(`  Fallback web search: ${test.fallbackWebSearchUsed}`)
+      console.log(`  PDF extraction: ${test.pdfExtractionHappened}`)
+      console.log(`  Intelligence objects: ${test.intelligenceObjectsPopulated}`)
+      console.log(`  Result count: ${test.resultCount}`)
+      console.log()
     }
   }
 

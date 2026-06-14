@@ -10,7 +10,6 @@ import {
   LENS_CONFIGS,
 } from './intelligence'
 import { extractIntelligence } from './entity-extraction'
-import { crawlAllProcurementSources, procurementToScrapedResult, type CrawlerDiagnostics } from './procurement-crawlers'
 import { rerankResults } from './semantic-search'
 import { fetchAndExtractFromURL, type ExtractionResult } from './document-extraction'
 import { createVectorStoreAdapter, type VectorStoreAdapter, type SearchDocument } from './vector-store'
@@ -382,109 +381,68 @@ export async function searchIntelligence(
   const expanded = expandQuery(query, forcedLens)
   const lens = expanded.lens
 
-  // Use specialized procurement crawlers for procurement lens (with timeout)
+  // Procurement lens uses web search with procurement-focused expansions
   if (lens === 'procurement') {
-    try {
-      // Add timeout wrapper for procurement crawler phase
-      const procurementPromise = (async () => {
-        const { opportunities: procurementOpportunities, diagnostics: crawlerDiagnostics } = await crawlAllProcurementSources(query)
-        const procurementResults = procurementOpportunities.map(procurementToScrapedResult)
+    const procurementExpansions = [
+      query,
+      `${query} RFP`,
+      `${query} RFQ`,
+      `${query} bid`,
+      `${query} solicitation`,
+      `${query} site:.gov`,
+      `${query} site:.us`,
+      `${query} PDF`,
+      'occupational health RFP',
+      'occupational medicine bid',
+      'occupational health services solicitation',
+      'DOT physical pricing',
+      'pulmonary function test pricing',
+    ]
+    
+    const { text, sources, rawTexts, results: searchResults } = await searchAllEngines(procurementExpansions, lens)
+    
+    // Enrich with intelligence objects
+    const enrichedResults = await Promise.all(
+      searchResults.slice(0, 30).map(async (result) => {
+        let content = ''
+        let extractionSource = 'scrape'
         
-        // Log crawler diagnostics
-        crawlerDiagnostics.forEach(d => {
-          console.log(`Crawler ${d.source}: ${d.status} (${d.resultsCount} results, ${d.latency}ms)${d.error ? ` - ${d.error}` : ''}`)
-        })
-        
-        return { procurementResults, crawlerDiagnostics }
-      })()
-
-      // Timeout after 15 seconds for entire procurement phase
-      const timeoutPromise = new Promise<{ procurementResults: ScrapedResult[]; crawlerDiagnostics: any }>((_, reject) =>
-        setTimeout(() => reject(new Error('Procurement crawler phase timeout')), 15000)
-      )
-
-      const { procurementResults, crawlerDiagnostics } = await Promise.race([procurementPromise, timeoutPromise])
-      
-      // Also run normal search with procurement-focused expansions in parallel
-      const procurementExpansions = [
-        query,
-        `${query} RFP`,
-        `${query} RFQ`,
-        `${query} bid`,
-        `${query} solicitation`,
-        `${query} site:.gov`,
-        `${query} site:.us`,
-        `${query} PDF`,
-        'occupational health RFP',
-        'occupational medicine bid',
-        'occupational health services solicitation',
-        'DOT physical pricing',
-        'pulmonary function test pricing',
-      ]
-      
-      const { text, sources, rawTexts, results: searchResults } = await searchAllEngines(procurementExpansions, lens)
-      
-      // Merge and dedupe crawler + search results
-      const seenUrls = new Set<string>()
-      const mergedResults: ScrapedResult[] = []
-      
-      for (const result of [...procurementResults, ...searchResults]) {
-        if (!seenUrls.has(result.url)) {
-          seenUrls.add(result.url)
-          mergedResults.push(result)
+        // Try PDF extraction for PDF URLs
+        if (result.url.toLowerCase().endsWith('.pdf')) {
+          try {
+            const extractionResult: ExtractionResult = await fetchAndExtractFromURL(result.url, 8000)
+            if (extractionResult.success && extractionResult.document) {
+              content = extractionResult.document.text
+              extractionSource = 'pdf'
+            }
+          } catch {
+            // Fall back to regular scraping
+          }
         }
-      }
-      
-      // Enrich with intelligence objects
-      const enrichedResults = await Promise.all(
-        mergedResults.slice(0, 30).map(async (result) => {
-          let content = ''
-          let extractionSource = 'scrape'
-          
-          // Try PDF extraction for PDF URLs
-          if (result.url.toLowerCase().endsWith('.pdf')) {
-            try {
-              const extractionResult: ExtractionResult = await fetchAndExtractFromURL(result.url, 8000)
-              if (extractionResult.success && extractionResult.document) {
-                content = extractionResult.document.text
-                extractionSource = 'pdf'
-              }
-            } catch {
-              // Fall back to regular scraping
-            }
+        
+        // Regular scraping fallback
+        if (!content) {
+          try {
+            content = await scrapeWebsite(result.url)
+            extractionSource = 'scrape'
+          } catch {
+            // If scraping fails, return result without intelligence
           }
-          
-          // Regular scraping fallback
-          if (!content) {
-            try {
-              content = await scrapeWebsite(result.url)
-              extractionSource = 'scrape'
-            } catch {
-              // If scraping fails, return result without intelligence
-            }
+        }
+        
+        if (content.length > 100) {
+          const intelligence = extractIntelligence(content, result.url, result.title, lens)
+          if (intelligence) {
+            return { ...result, intelligence, extractionSource }
           }
-          
-          if (content.length > 100) {
-            const intelligence = extractIntelligence(content, result.url, result.title, lens)
-            if (intelligence) {
-              return { ...result, intelligence, extractionSource }
-            }
-          }
-          
-          return result
-        })
-      )
-      
-      const mergedSources = [...new Set([...procurementResults.map(r => r.source), ...sources])]
-      const mergedRawTexts = [...procurementResults.map(r => r.title + ' ' + (r.description || '')), ...rawTexts]
-      const mergedText = mergedRawTexts.join(' ')
-      
-      const intelligence = buildIntelligenceObject(query, expanded, mergedSources, mergedRawTexts)
-      return { intelligence, results: enrichedResults }
-    } catch (err) {
-      console.warn('Procurement crawlers failed or timed out, falling back to general search:', err)
-      // Fall through to general search
-    }
+        }
+        
+        return result
+      })
+    )
+    
+    const intelligence = buildIntelligenceObject(query, expanded, sources, rawTexts)
+    return { intelligence, results: enrichedResults }
   }
 
   const allQueries = [
