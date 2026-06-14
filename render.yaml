@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: omnisearch-browser
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BRAVE_API_KEY
+        sync: false
