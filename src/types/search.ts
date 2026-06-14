@@ -1,3 +1,4 @@
+// ─── Legacy generic search result (kept for backward compat) ───
 export interface SearchResult {
   id: string;
   title: string;
@@ -13,6 +14,36 @@ export interface SearchResult {
 }
 
 export type SearchSource = "google" | "bing" | "duckduckgo" | "brave" | "wikipedia" | "github" | "stackoverflow" | "news" | "scholar" | "semantic";
+
+// ─── Intelligence types (aligned with backend) ───
+export type Vertical = "contact" | "procurement" | "provider" | "pricing" | "general";
+
+export interface Signal {
+  name: string;
+  score: number;
+  description: string;
+}
+
+export interface ContactResult {
+  id: string;
+  type: "phone" | "email" | "fax" | "linkedin" | "website";
+  value: string;
+  label: string;
+  source: string;
+  confidence: number;
+}
+
+export interface IntelligenceObject {
+  organization: string;
+  vertical: Vertical;
+  confidence: number;
+  contacts: ContactResult[];
+  signals: Signal[];
+  sources: string[];
+  queryExpansions: string[];
+  timestamp: string;
+  note?: string;
+}
 
 export interface SearchFilters {
   sources: SearchSource[];
