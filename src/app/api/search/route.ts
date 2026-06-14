@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchIntelligence, generateMockResults, type Vertical } from "../../../lib/search";
+import { searchIntelligence, type SearchLens, type ScrapedResult } from "../../../lib/search";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, vertical } = body as { query: string; vertical?: Vertical };
+    const { query, lens } = body as { query: string; lens?: SearchLens };
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    try {
-      const result = await searchIntelligence(query, vertical);
-      return NextResponse.json(result);
-    } catch (err) {
-      console.warn("Intelligence search failed, falling back to mock:", err);
-      const mock = generateMockResults(query);
-      return NextResponse.json({
-        organization: mock.organization,
-        vertical: vertical || "contact",
-        confidence: Math.round(mock.contacts.reduce((a, c) => a + c.confidence, 0) / mock.contacts.length),
-        contacts: mock.contacts,
-        signals: [],
-        sources: mock.sources,
-        queryExpansions: [],
-        timestamp: mock.timestamp,
-        note: "Search engines unavailable. Showing generated data.",
-      });
-    }
+    const { intelligence, results } = await searchIntelligence(query, lens);
+
+    return NextResponse.json({
+      query: intelligence.query,
+      lens: intelligence.lens,
+      summary: intelligence.summary,
+      expandedQueries: intelligence.queryExpansions,
+      signals: intelligence.signals,
+      results,
+      sources: intelligence.sources,
+      timestamp: intelligence.timestamp,
+      confidence: intelligence.confidence,
+    });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(

@@ -1,4 +1,4 @@
-export type Vertical = 'contact' | 'procurement' | 'provider' | 'pricing' | 'general'
+export type SearchLens = 'web' | 'pdf' | 'government' | 'procurement' | 'pricing' | 'technical' | 'news'
 
 export interface Signal {
   name: string
@@ -7,17 +7,10 @@ export interface Signal {
 }
 
 export interface IntelligenceObject {
-  organization: string
-  vertical: Vertical
+  query: string
+  lens: SearchLens
+  summary?: string
   confidence: number
-  contacts: Array<{
-    id: string
-    type: 'phone' | 'email' | 'fax' | 'linkedin' | 'website'
-    value: string
-    label: string
-    source: string
-    confidence: number
-  }>
   signals: Signal[]
   sources: string[]
   queryExpansions: string[]
@@ -41,35 +34,62 @@ interface VerticalConfig {
   }>
 }
 
-const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
-  contact: {
-    label: 'CONTACT INTEL',
-    description: 'Hunt phone, email, fax, LinkedIn, and web presence',
-    keywords: ['contact', 'phone', 'email', 'fax', 'reach', 'call', 'directory'],
-    synonymMap: {
-      company: ['corporation', 'inc', 'llc', 'organization', 'enterprise', 'firm', 'agency'],
-      contact: ['phone', 'email', 'fax', 'address', 'reach', 'connect'],
-      phone: ['telephone', 'direct line', 'main line', 'toll free', 'mobile', 'office'],
-      email: ['e-mail', 'contact email', 'support email', 'inquiries', 'info'],
-      linkedin: ['linked in', 'professional profile', 'company page'],
-    },
+const LENS_CONFIGS: Record<SearchLens, VerticalConfig> = {
+  web: {
+    label: 'WEB',
+    description: 'Broad-spectrum web search',
+    keywords: [],
+    synonymMap: {},
     expansions: (q) => [
-      `${q} contact phone email`,
-      `${q} phone number`,
-      `${q} email address`,
-      `${q} LinkedIn`,
-      `${q} fax number`,
-      `${q} headquarters address`,
-      `${q} corporate office`,
-      `${q} customer service`,
+      `${q} information`,
+      `${q} about`,
+      `${q} services`,
+      `${q} overview`,
     ],
     siteOperators: [],
     scoringRules: [
-      { pattern: /contact|phone|email/i, score: 25, name: 'contact keywords' },
-      { pattern: /headquarters|corporate office|main office/i, score: 20, name: 'corporate presence' },
-      { pattern: /linkedin\.com\/company/i, score: 35, name: 'LinkedIn company page' },
-      { pattern: /\+?1\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/, score: 30, name: 'phone number found' },
-      { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/, score: 25, name: 'email found' },
+      { pattern: /about|information|overview/i, score: 10, name: 'general info' },
+    ],
+  },
+
+  pdf: {
+    label: 'PDF',
+    description: 'Find PDF documents and files',
+    keywords: ['pdf', 'document', 'file', 'report', 'guide', 'manual'],
+    synonymMap: {
+      pdf: ['document', 'file', 'report', 'guide', 'manual', 'whitepaper'],
+    },
+    expansions: (q) => [
+      `filetype:pdf ${q}`,
+      `${q} pdf`,
+      `${q} document`,
+      `${q} report`,
+      `${q} guide`,
+    ],
+    siteOperators: ['filetype:pdf'],
+    scoringRules: [
+      { pattern: /filetype:pdf|\.pdf/i, score: 40, name: 'PDF document' },
+      { pattern: /document|report|guide|manual/i, score: 20, name: 'document language' },
+    ],
+  },
+
+  government: {
+    label: 'GOVERNMENT',
+    description: 'Find government sources and official documents',
+    keywords: ['government', 'official', 'federal', 'state', 'agency', 'department'],
+    synonymMap: {
+      government: ['federal', 'state', 'official', 'agency', 'department', 'authority'],
+    },
+    expansions: (q) => [
+      `site:.gov ${q}`,
+      `${q} government`,
+      `${q} official`,
+      `${q} agency`,
+    ],
+    siteOperators: ['site:.gov'],
+    scoringRules: [
+      { pattern: /\.gov\b/i, score: 35, name: '.gov domain' },
+      { pattern: /government|official|federal|state agency/i, score: 30, name: 'government source' },
     ],
   },
 
@@ -105,30 +125,50 @@ const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
     ],
   },
 
-  provider: {
-    label: 'PROVIDER INTEL',
-    description: 'Discover clinics, physicians, and healthcare providers',
-    keywords: ['clinic', 'provider', 'doctor', 'physician', 'healthcare', 'medical', 'practice'],
+  technical: {
+    label: 'TECHNICAL',
+    description: 'Find technical documentation, code, and developer resources',
+    keywords: ['api', 'documentation', 'code', 'developer', 'github', 'stack overflow', 'programming'],
     synonymMap: {
-      clinic: ['medical center', 'health center', 'practice', 'facility', 'office'],
-      provider: ['doctor', 'physician', 'practitioner', 'specialist', 'clinician'],
-      occupational: ['worksite', 'industrial', 'employee', 'corporate'],
+      api: ['interface', 'endpoint', 'rest', 'graphql', 'sdk'],
+      documentation: ['docs', 'guide', 'reference', 'manual', 'tutorial'],
+      code: ['source', 'repository', 'repo', 'programming', 'development'],
     },
     expansions: (q) => [
-      `${q} clinic`,
-      `${q} provider directory`,
-      `${q} medical practice`,
-      `${q} healthcare provider`,
-      `${q} physician`,
-      `${q} services offered`,
-      `${q} locations`,
+      `${q} api documentation`,
+      `${q} developer guide`,
+      `site:github.com ${q}`,
+      `site:stackoverflow.com ${q}`,
+      `${q} tutorial`,
+      `${q} code example`,
+    ],
+    siteOperators: ['site:github.com', 'site:stackoverflow.com', 'site:devdocs.io'],
+    scoringRules: [
+      { pattern: /github\.com/i, score: 30, name: 'GitHub source' },
+      { pattern: /stackoverflow\.com/i, score: 25, name: 'Stack Overflow' },
+      { pattern: /api|documentation|docs/i, score: 30, name: 'technical docs' },
+      { pattern: /code|programming|developer/i, score: 25, name: 'developer content' },
+    ],
+  },
+
+  news: {
+    label: 'NEWS',
+    description: 'Find recent news articles and press coverage',
+    keywords: ['news', 'press', 'article', 'report', 'breaking', 'coverage'],
+    synonymMap: {
+      news: ['press', 'article', 'report', 'coverage', 'breaking'],
+    },
+    expansions: (q) => [
+      `${q} news`,
+      `${q} press release`,
+      `${q} article`,
+      `${q} coverage`,
+      `${q} latest`,
     ],
     siteOperators: [],
     scoringRules: [
-      { pattern: /clinic|medical center|health center|practice/i, score: 30, name: 'provider entity' },
-      { pattern: /physician|doctor|provider|clinician/i, score: 25, name: 'provider keywords' },
-      { pattern: /board certified|licensed|accredited/i, score: 20, name: 'credentials' },
-      { pattern: /location|address|suite|floor/i, score: 15, name: 'physical address' },
+      { pattern: /news|press|article|coverage/i, score: 30, name: 'news content' },
+      { pattern: /breaking|latest|recent/i, score: 20, name: 'recent content' },
     ],
   },
 
@@ -160,57 +200,45 @@ const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
     ],
   },
 
-  general: {
-    label: 'GENERAL INTEL',
-    description: 'Broad-spectrum search across all vectors',
-    keywords: [],
-    synonymMap: {},
-    expansions: (q) => [
-      `${q} contact`,
-      `${q} information`,
-      `${q} about`,
-      `${q} services`,
-    ],
-    siteOperators: [],
-    scoringRules: [
-      { pattern: /contact|about|information/i, score: 10, name: 'general info' },
-    ],
-  },
 }
 
 // ─── CLASSIFY VERTICAL ───
 
-export function classifyVertical(query: string): Vertical {
+export function classifyLens(query: string): SearchLens {
   const q = query.toLowerCase()
-  const scores: Record<Vertical, number> = {
-    contact: 0,
+  const scores: Record<SearchLens, number> = {
+    web: 1,
+    pdf: 0,
+    government: 0,
     procurement: 0,
-    provider: 0,
     pricing: 0,
-    general: 1,
+    technical: 0,
+    news: 0,
   }
 
-  for (const [vertical, config] of Object.entries(VERTICAL_CONFIGS)) {
-    if (vertical === 'general') continue
+  for (const [lens, config] of Object.entries(LENS_CONFIGS)) {
+    if (lens === 'web') continue
     for (const kw of config.keywords) {
       if (q.includes(kw.toLowerCase())) {
-        scores[vertical as Vertical] += 2
+        scores[lens as SearchLens] += 2
       }
     }
   }
 
   // Special weighting
   if (/\b(rfp|rfq|tender|solicitation|procurement|bid)\b/i.test(q)) scores.procurement += 5
-  if (/\b(clinic|physician|doctor|provider|medical)\b/i.test(q)) scores.provider += 5
   if (/\b(price|cost|fee|rate|pricing|schedule)\b/i.test(q)) scores.pricing += 5
-  if (/\b(contact|phone|email|fax)\b/i.test(q)) scores.contact += 3
+  if (/\b(pdf|document|file|report|guide|manual)\b/i.test(q)) scores.pdf += 3
+  if (/\b(government|official|federal|state|agency)\b/i.test(q)) scores.government += 4
+  if (/\b(api|documentation|code|developer|github|programming)\b/i.test(q)) scores.technical += 4
+  if (/\b(news|press|article|coverage|breaking)\b/i.test(q)) scores.news += 4
 
-  let best: Vertical = 'general'
+  let best: SearchLens = 'web'
   let bestScore = 0
-  for (const [v, s] of Object.entries(scores)) {
+  for (const [lens, s] of Object.entries(scores)) {
     if (s > bestScore) {
       bestScore = s
-      best = v as Vertical
+      best = lens as SearchLens
     }
   }
 
@@ -221,15 +249,15 @@ export function classifyVertical(query: string): Vertical {
 
 export interface ExpandedQuery {
   original: string
-  vertical: Vertical
+  lens: SearchLens
   expansions: string[]
   withOperators: string[]
   synonyms: Record<string, string[]>
 }
 
-export function expandQuery(query: string, forcedVertical?: Vertical): ExpandedQuery {
-  const vertical = forcedVertical || classifyVertical(query)
-  const config = VERTICAL_CONFIGS[vertical]
+export function expandQuery(query: string, forcedLens?: SearchLens): ExpandedQuery {
+  const lens = forcedLens || classifyLens(query)
+  const config = LENS_CONFIGS[lens]
 
   // Build synonym map for this specific query
   const synonyms: Record<string, string[]> = {}
@@ -263,7 +291,7 @@ export function expandQuery(query: string, forcedVertical?: Vertical): ExpandedQ
 
   return {
     original: query,
-    vertical,
+    lens,
     expansions: [...new Set([...expansions, ...synonymVariants])],
     withOperators: [...new Set(withOperators)],
     synonyms,
@@ -286,9 +314,6 @@ export function scoreSignals(text: string, url?: string): Signal[] {
   if (/\.org\b/.test(url || '')) {
     signals.push({ name: '.org domain', score: 15, description: 'Non-profit organization' })
   }
-  if (/linkedin\.com/.test(url || '')) {
-    signals.push({ name: 'LinkedIn source', score: 35, description: 'Professional network verified' })
-  }
 
   // Content signals
   if (/RFP|request for proposal|solicitation|bid|tender|procurement/i.test(text)) {
@@ -307,17 +332,6 @@ export function scoreSignals(text: string, url?: string): Signal[] {
     signals.push({ name: 'credentials', score: 20, description: 'Professional credentials mentioned' })
   }
 
-  // Contact signals
-  if (/\+?1\s*\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(text)) {
-    signals.push({ name: 'phone detected', score: 25, description: 'Telephone number found in content' })
-  }
-  if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(text)) {
-    signals.push({ name: 'email detected', score: 25, description: 'Email address found in content' })
-  }
-  if (/linkedin\.com\/(?:company|in)\//.test(text)) {
-    signals.push({ name: 'LinkedIn profile', score: 30, description: 'LinkedIn presence confirmed' })
-  }
-
   // Negative signals
   if (/spam|scam|fake|unverified/i.test(text)) {
     signals.push({ name: 'suspicious content', score: -40, description: 'Potential spam or fraud indicators' })
@@ -329,10 +343,9 @@ export function scoreSignals(text: string, url?: string): Signal[] {
   return signals
 }
 
-export function calculateConfidence(signals: Signal[], baseContacts: number): number {
+export function calculateConfidence(signals: Signal[]): number {
   const totalScore = signals.reduce((sum, s) => sum + s.score, 0)
-  const contactBonus = Math.min(baseContacts * 5, 25)
-  const raw = Math.min(totalScore + contactBonus + 40, 100)
+  const raw = Math.min(totalScore + 40, 100)
   return Math.max(0, Math.round(raw))
 }
 
@@ -341,7 +354,6 @@ export function calculateConfidence(signals: Signal[], baseContacts: number): nu
 export function buildIntelligenceObject(
   query: string,
   expanded: ExpandedQuery,
-  contacts: IntelligenceObject['contacts'],
   rawSources: string[],
   rawTexts: string[],
   note?: string
@@ -359,13 +371,16 @@ export function buildIntelligenceObject(
     }
   }
 
-  const confidence = calculateConfidence(allSignals, contacts.length)
+  const confidence = calculateConfidence(allSignals)
+
+  // Generate a summary based on signals and lens
+  const summary = generateSummary(query, expanded.lens, allSignals)
 
   return {
-    organization: query,
-    vertical: expanded.vertical,
+    query,
+    lens: expanded.lens,
+    summary,
     confidence,
-    contacts,
     signals: allSignals,
     sources: [...new Set(rawSources)],
     queryExpansions: expanded.expansions,
@@ -374,73 +389,10 @@ export function buildIntelligenceObject(
   }
 }
 
-// ─── MOCK INTELLIGENCE OBJECTS BY VERTICAL ───
-
-export function generateMockIntelligence(query: string, vertical: Vertical): IntelligenceObject {
-  const slug = query.toLowerCase().replace(/\s+/g, '-')
-  const areaCode = 200 + Math.floor(Math.random() * 800)
-  const prefix = 300 + Math.floor(Math.random() * 700)
-  const line = 1000 + Math.floor(Math.random() * 9000)
-
-  const baseContacts: IntelligenceObject['contacts'] = [
-    {
-      id: '1',
-      type: 'phone',
-      value: `+1 (${areaCode}) ${prefix}-${line}`,
-      label: 'Main Office',
-      source: 'Corporate Registry',
-      confidence: 92,
-    },
-    {
-      id: '2',
-      type: 'email',
-      value: `info@${slug}.com`,
-      label: 'General Inquiries',
-      source: 'Website Crawl',
-      confidence: 88,
-    },
-    {
-      id: '3',
-      type: 'website',
-      value: `https://www.${slug}.com`,
-      label: 'Official Website',
-      source: 'DNS Lookup',
-      confidence: 96,
-    },
-    {
-      id: '4',
-      type: 'linkedin',
-      value: `https://linkedin.com/company/${slug}`,
-      label: 'Company Profile',
-      source: 'LinkedIn API',
-      confidence: 95,
-    },
-  ]
-
-  if (vertical === 'procurement') {
-    baseContacts.push({
-      id: '5',
-      type: 'email',
-      value: `procurement@${slug}.com`,
-      label: 'Procurement Office',
-      source: 'Government Portal',
-      confidence: 78,
-    })
-  }
-
-  const signals = scoreSignals(`${query} ${vertical} contact info`)
-
-  return {
-    organization: query,
-    vertical,
-    confidence: calculateConfidence(signals, baseContacts.length),
-    contacts: baseContacts,
-    signals,
-    sources: ['Corporate Registry', 'LinkedIn API', 'WHOIS Database', 'Public Directory', 'Website Crawl'],
-    queryExpansions: VERTICAL_CONFIGS[vertical].expansions(query),
-    timestamp: new Date().toISOString(),
-    note: 'Demonstration data. Live scraping unavailable.',
-  }
+function generateSummary(query: string, lens: SearchLens, signals: Signal[]): string {
+  const signalNames = signals.filter(s => s.score > 0).map(s => s.name).slice(0, 3)
+  const signalText = signalNames.length > 0 ? signalNames.join(', ') : 'general content'
+  return `Results for "${query}" using ${lens} lens. Detected: ${signalText}. Found ${signals.length} relevance signals.`
 }
 
-export { VERTICAL_CONFIGS }
+export { LENS_CONFIGS }

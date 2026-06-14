@@ -1,15 +1,15 @@
-# Contact Intelligence — Vertical Search Platform
+# Ultra Search Browser
 
-A search intelligence platform with query expansion, signal scoring, and vertical routing. Scrapes DuckDuckGo/Bing/Google with zero API keys required.
+A Kagi-style broad search browser with multi-engine aggregation, query intelligence, signal scoring, and structured results — all without API keys.
 
 ## Features
 
-- **Query Expansion Engine**: Auto-expands queries with synonyms and search operators
-- **Vertical Search Routing**: Contact, Procurement, Provider, and Pricing lenses
-- **Signal Scoring**: Domain authority, document type, and content signals
-- **Intelligence Objects**: Structured results with confidence scores
-- **Web Scraping**: Zero API keys — uses cheerio + DuckDuckGo
-- **Spy-Grade UI**: Matrix rain, radar, globe visualization, glassmorphism
+- **Multi-Engine Aggregation**: Simultaneously scrapes DuckDuckGo, Bing, and Google for maximum coverage
+- **Query Expansion Engine**: Auto-expands queries with synonyms, operators, and lens-specific terms
+- **Search Lenses**: Web, PDF, Government, Procurement, Pricing, Technical, and News lenses
+- **Signal Scoring**: Domain authority, document type, and content signals for relevance ranking
+- **Intelligence Summary**: Structured results with confidence scores and query expansions
+- **Zero API Keys**: Uses cheerio + web scraping — no paid services required
 
 ## Tech Stack
 

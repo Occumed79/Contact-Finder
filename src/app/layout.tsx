@@ -5,8 +5,8 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Contact Intelligence | Spy-Grade OSINT",
-  description: "Hunt down contact information with spy-grade precision",
+  title: "Ultra Search Browser | Kagi-Style Search",
+  description: "Multi-engine search browser with query intelligence and signal scoring",
 };
 
 export const viewport: Viewport = {
