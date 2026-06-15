@@ -24,3 +24,7 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: APIFY_API_KEY
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false

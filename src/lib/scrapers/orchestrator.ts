@@ -4,6 +4,8 @@ import { searchAllApis, type ApiSearchResult } from './api-scraper'
 import { scrapeAllDirectSources, type DirectScrapeResult } from './direct-scraper'
 import { searchScrapeGraphAI, scrapeGraphAIDirectSearch, type ScrapeGraphResult } from './scrapegraph-scraper'
 import { searchGemini, geminiDirectSearch, type GeminiResult } from './gemini-scraper'
+import { searchApify, apifyGoogleSearch, type ApifyResult } from './apify-scraper'
+import { searchFirecrawl, firecrawlMap, type FirecrawlResult } from './firecrawl-scraper'
 import { extractEmails, extractPhones, extractLinkedIn, extractWebsites, extractFax } from '../search'
 import type { Vertical } from '../intelligence'
 
@@ -25,6 +27,8 @@ export interface MultiDimensionResult {
     direct: { success: boolean; sources: string[] }
     scrapegraph: { success: boolean; sources: string[] }
     gemini: { success: boolean; sources: string[] }
+    apify: { success: boolean; sources: string[] }
+    firecrawl: { success: boolean; sources: string[] }
   }
   totalMethodsAttempted: number
   successfulMethods: number
@@ -45,6 +49,8 @@ export async function multiDimensionSearch(
     direct: { success: false, sources: [] },
     scrapegraph: { success: false, sources: [] },
     gemini: { success: false, sources: [] },
+    apify: { success: false, sources: [] },
+    firecrawl: { success: false, sources: [] },
   }
 
   let id = 1
@@ -298,11 +304,79 @@ export async function multiDimensionSearch(
     console.error('Gemini dimension failed:', error)
   }
 
+  // ── Dimension 7: Apify ──
+  try {
+    const [apifyResult, apifyGoogleResult] = await Promise.allSettled([
+      searchApify(query),
+      apifyGoogleSearch(query),
+    ])
+
+    if (apifyResult.status === 'fulfilled' && apifyResult.value.success) {
+      methodBreakdown.apify.success = true
+      methodBreakdown.apify.sources.push('Apify')
+      rawTexts.push(apifyResult.value.text)
+
+      for (const contact of apifyResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Apify', 92)
+      }
+
+      sources.push('Apify')
+    }
+
+    if (apifyGoogleResult.status === 'fulfilled' && apifyGoogleResult.value.success) {
+      methodBreakdown.apify.success = true
+      methodBreakdown.apify.sources.push('Apify Google Search')
+      rawTexts.push(apifyGoogleResult.value.text)
+
+      for (const contact of apifyGoogleResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Apify Google Search', 92)
+      }
+
+      sources.push('Apify Google Search')
+    }
+  } catch (error) {
+    console.error('Apify dimension failed:', error)
+  }
+
+  // ── Dimension 8: Firecrawl ──
+  try {
+    const [firecrawlResult, firecrawlMapResult] = await Promise.allSettled([
+      searchFirecrawl(query),
+      firecrawlMap(query),
+    ])
+
+    if (firecrawlResult.status === 'fulfilled' && firecrawlResult.value.success) {
+      methodBreakdown.firecrawl.success = true
+      methodBreakdown.firecrawl.sources.push('Firecrawl')
+      rawTexts.push(firecrawlResult.value.text)
+
+      for (const contact of firecrawlResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Firecrawl', 93)
+      }
+
+      sources.push('Firecrawl')
+    }
+
+    if (firecrawlMapResult.status === 'fulfilled' && firecrawlMapResult.value.success) {
+      methodBreakdown.firecrawl.success = true
+      methodBreakdown.firecrawl.sources.push('Firecrawl Map')
+      rawTexts.push(firecrawlMapResult.value.text)
+
+      for (const contact of firecrawlMapResult.value.contacts) {
+        addContact(contact.type, contact.value, contact.label, 'Firecrawl Map', 93)
+      }
+
+      sources.push('Firecrawl Map')
+    }
+  } catch (error) {
+    console.error('Firecrawl dimension failed:', error)
+  }
+
   // ── Cleanup ──
   await closePlaywrightScraper()
 
   // ── Calculate stats ──
-  const totalMethodsAttempted = 6
+  const totalMethodsAttempted = 8
   const successfulMethods = [
     methodBreakdown.playwright.success,
     methodBreakdown.corsProxy.success,
@@ -310,6 +384,8 @@ export async function multiDimensionSearch(
     methodBreakdown.direct.success,
     methodBreakdown.scrapegraph.success,
     methodBreakdown.gemini.success,
+    methodBreakdown.apify.success,
+    methodBreakdown.firecrawl.success,
   ].filter(Boolean).length
 
   return {
