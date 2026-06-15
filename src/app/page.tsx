@@ -150,7 +150,7 @@ export default function Home() {
             <div className="glass-panel-luminous rounded-2xl p-1.5 luminous-border">
               <div className="flex gap-1 mb-1.5 px-1">
                 {VERTICALS.map((v) => (
-                  <button key={v.id} onClick={() => setVertical(v.id)}
+                  <button key={v.id} onClick={() => setVertical(v.id as Vertical)}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg spy-text text-[10px] tracking-wider transition-all border ${
                       vertical === v.id ? `${v.color} bg-white/10 border-white/20` : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
                     }`}>

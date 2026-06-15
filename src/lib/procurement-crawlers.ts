@@ -1,5 +1,17 @@
 import * as cheerio from 'cheerio'
-import type { ScrapedResult } from '../types/search'
+
+export interface ScrapedResult {
+  title: string
+  url: string
+  description: string
+  content?: string
+  source: string
+  timestamp: string
+  domain?: string
+  rank?: number
+  score?: number
+  resultType?: string
+}
 
 // ─── SPECIALIZED PROCUREMENT CRAWLERS ───
 // SERVER-SIDE ONLY: This module must only be imported in server-side code (API routes, server components)
@@ -976,6 +988,7 @@ export function procurementToScrapedResult(opp: ProcurementOpportunity): Scraped
     description: `${opp.organization} - ${opp.opportunityType}${opp.dueDate ? ` - Due: ${opp.dueDate}` : ''}`,
     domain: new URL(opp.documentUrl).hostname.replace(/^www\./, ''),
     source: opp.source,
+    timestamp: new Date().toISOString(),
     rank: 0,
     score: 0,
     resultType: 'procurement',

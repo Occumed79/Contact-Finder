@@ -108,7 +108,7 @@ export async function searchApify(query: string): Promise<ApifyResult> {
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
     const emailMatches = combinedText.match(emailRegex)
     if (emailMatches) {
-      emailMatches.forEach((email, i) => {
+      emailMatches.forEach((email: string, i: number) => {
         if (!email.includes('@example.com')) {
           contacts.push({
             type: 'email',
@@ -122,7 +122,7 @@ export async function searchApify(query: string): Promise<ApifyResult> {
     const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g
     const phoneMatches = combinedText.match(phoneRegex)
     if (phoneMatches) {
-      phoneMatches.forEach((phone, i) => {
+      phoneMatches.forEach((phone: string, i: number) => {
         contacts.push({
           type: 'phone',
           value: phone,
@@ -134,7 +134,7 @@ export async function searchApify(query: string): Promise<ApifyResult> {
     const linkedinRegex = /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/[a-zA-Z0-9-]+/g
     const linkedinMatches = combinedText.match(linkedinRegex)
     if (linkedinMatches) {
-      linkedinMatches.forEach((linkedin, i) => {
+      linkedinMatches.forEach((linkedin: string, i: number) => {
         contacts.push({
           type: 'linkedin',
           value: linkedin,
@@ -146,7 +146,7 @@ export async function searchApify(query: string): Promise<ApifyResult> {
     const urlRegex = /https?:\/\/(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/g
     const urlMatches = combinedText.match(urlRegex)
     if (urlMatches) {
-      urlMatches.forEach((url, i) => {
+      urlMatches.forEach((url: string, i: number) => {
         if (!url.includes('linkedin.com') && !url.includes('apify.com')) {
           contacts.push({
             type: 'website',
@@ -241,7 +241,7 @@ export async function apifyGoogleSearch(query: string): Promise<ApifyResult> {
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
     const emailMatches = combinedText.match(emailRegex)
     if (emailMatches) {
-      emailMatches.forEach((email, i) => {
+      emailMatches.forEach((email: string, i: number) => {
         if (!email.includes('@example.com')) {
           contacts.push({
             type: 'email',
@@ -255,7 +255,7 @@ export async function apifyGoogleSearch(query: string): Promise<ApifyResult> {
     const phoneRegex = /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g
     const phoneMatches = combinedText.match(phoneRegex)
     if (phoneMatches) {
-      phoneMatches.forEach((phone, i) => {
+      phoneMatches.forEach((phone: string, i: number) => {
         contacts.push({
           type: 'phone',
           value: phone,
@@ -267,7 +267,7 @@ export async function apifyGoogleSearch(query: string): Promise<ApifyResult> {
     const linkedinRegex = /https?:\/\/(?:www\.)?linkedin\.com\/(?:in|company)\/[a-zA-Z0-9-]+/g
     const linkedinMatches = combinedText.match(linkedinRegex)
     if (linkedinMatches) {
-      linkedinMatches.forEach((linkedin, i) => {
+      linkedinMatches.forEach((linkedin: string, i: number) => {
         contacts.push({
           type: 'linkedin',
           value: linkedin,
