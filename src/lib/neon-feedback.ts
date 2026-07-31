@@ -20,6 +20,10 @@ function getDatabaseUrl(): string | null {
   return databaseUrl && databaseUrl.length > 0 ? databaseUrl : null;
 }
 
+function makeKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function getPool(): Pool | null {
   const databaseUrl = getDatabaseUrl();
   if (!databaseUrl) return null;
@@ -51,16 +55,29 @@ async function ensureSchema(): Promise<boolean> {
         CREATE TABLE IF NOT EXISTS contact_feedback (
           id BIGSERIAL PRIMARY KEY,
           value TEXT NOT NULL,
+          value_key TEXT,
           type TEXT NOT NULL CHECK (type IN ('email', 'linkedin', 'employee')),
           organization TEXT NOT NULL,
+          organization_key TEXT,
           verdict TEXT NOT NULL CHECK (verdict IN ('good', 'bad')),
           timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
+        ALTER TABLE contact_feedback ADD COLUMN IF NOT EXISTS value_key TEXT;
+        ALTER TABLE contact_feedback ADD COLUMN IF NOT EXISTS organization_key TEXT;
+
+        UPDATE contact_feedback
+        SET value_key = lower(value)
+        WHERE value_key IS NULL;
+
+        UPDATE contact_feedback
+        SET organization_key = lower(organization)
+        WHERE organization_key IS NULL;
+
         CREATE UNIQUE INDEX IF NOT EXISTS contact_feedback_unique_value_org
-          ON contact_feedback (lower(value), lower(organization));
+          ON contact_feedback (value_key, organization_key);
       `)
       .then(() => undefined)
       .catch((error) => {
@@ -107,11 +124,22 @@ export async function saveFeedbackEntry(entry: FeedbackEntry): Promise<FeedbackE
 
   const result = await pool.query<FeedbackRow>(
     `
-      INSERT INTO contact_feedback (value, type, organization, verdict, timestamp, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (lower(value), lower(organization))
+      INSERT INTO contact_feedback (
+        value,
+        value_key,
+        type,
+        organization,
+        organization_key,
+        verdict,
+        timestamp,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      ON CONFLICT (value_key, organization_key)
       DO UPDATE SET
+        value = EXCLUDED.value,
         type = EXCLUDED.type,
+        organization = EXCLUDED.organization,
         verdict = EXCLUDED.verdict,
         timestamp = EXCLUDED.timestamp,
         updated_at = NOW()
@@ -119,8 +147,10 @@ export async function saveFeedbackEntry(entry: FeedbackEntry): Promise<FeedbackE
     `,
     [
       normalized.value,
+      makeKey(normalized.value),
       normalized.type,
       normalized.organization,
+      makeKey(normalized.organization),
       normalized.verdict,
       normalized.timestamp,
     ]
