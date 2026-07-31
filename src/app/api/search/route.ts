@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { multiDimensionSearch } from "../../../lib/scrapers/orchestrator";
 import { buildIntelligenceObject, expandQuery } from "../../../lib/intelligence";
 import { applyLearningFilter } from "../../../lib/learning";
-import { getFeedbackEntries } from "../../../lib/neon-feedback";
+import { getFeedbackEntriesForOrganization } from "../../../lib/neon-feedback";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,10 +18,14 @@ export async function POST(request: NextRequest) {
     try {
       const multiResult = await multiDimensionSearch(organization);
       let learnedContacts = multiResult.contacts;
+      let learnedFeedbackCount = 0;
 
       if (learnedContacts.length > 0) {
         try {
-          const feedbackEntries = await getFeedbackEntries(2_000);
+          // Pull the persisted good/bad learning for this organization from Neon before scoring.
+          // This is the retention layer: browser localStorage is not used for learning memory.
+          const feedbackEntries = await getFeedbackEntriesForOrganization(organization, 10_000);
+          learnedFeedbackCount = feedbackEntries.length;
           learnedContacts = applyLearningFilter(learnedContacts, organization, feedbackEntries);
         } catch (learningError) {
           console.warn("Learning feedback unavailable; returning unfiltered contacts:", learningError);
@@ -38,6 +42,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           ...intelligenceObject,
+          learning: {
+            persisted: true,
+            feedbackCount: learnedFeedbackCount,
+            source: "neon",
+          },
           methodBreakdown: multiResult.methodBreakdown,
           totalMethodsAttempted: multiResult.totalMethodsAttempted,
           successfulMethods: multiResult.successfulMethods,
@@ -53,6 +62,11 @@ export async function POST(request: NextRequest) {
         sources: multiResult.sources,
         queryExpansions: expanded.expansions,
         timestamp: new Date().toISOString(),
+        learning: {
+          persisted: true,
+          feedbackCount: learnedFeedbackCount,
+          source: "neon",
+        },
         note: "No emails, LinkedIn profiles, or employees found after learning filters. Try a more specific company name or full legal name.",
         methodBreakdown: multiResult.methodBreakdown,
         totalMethodsAttempted: multiResult.totalMethodsAttempted,
