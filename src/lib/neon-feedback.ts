@@ -78,6 +78,9 @@ async function ensureSchema(): Promise<boolean> {
 
         CREATE UNIQUE INDEX IF NOT EXISTS contact_feedback_unique_value_org
           ON contact_feedback (value_key, organization_key);
+
+        CREATE INDEX IF NOT EXISTS contact_feedback_organization_lookup
+          ON contact_feedback (organization_key, updated_at DESC);
       `)
       .then(() => undefined)
       .catch((error) => {
@@ -108,6 +111,10 @@ function toFeedbackEntry(row: FeedbackRow): FeedbackEntry {
     verdict: row.verdict,
     timestamp: new Date(row.timestamp).toISOString(),
   };
+}
+
+function clampLimit(limit: number): number {
+  return Math.min(Math.max(Math.trunc(limit), 1), 10_000);
 }
 
 export function isNeonConfigured(): boolean {
@@ -166,15 +173,41 @@ export async function getFeedbackEntries(limit = 50): Promise<FeedbackEntry[]> {
     return [];
   }
 
-  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 2_000);
+  const safeLimit = clampLimit(limit);
   const result = await pool.query<FeedbackRow>(
     `
       SELECT value, type, organization, verdict, timestamp
       FROM contact_feedback
-      ORDER BY timestamp DESC
+      ORDER BY updated_at DESC, timestamp DESC
       LIMIT $1;
     `,
     [safeLimit]
+  );
+
+  return result.rows.map(toFeedbackEntry);
+}
+
+export async function getFeedbackEntriesForOrganization(
+  organization: string,
+  limit = 10_000
+): Promise<FeedbackEntry[]> {
+  const pool = getPool();
+
+  if (!pool || !(await ensureSchema())) {
+    return [];
+  }
+
+  const organizationKey = makeKey(organization);
+  const safeLimit = clampLimit(limit);
+  const result = await pool.query<FeedbackRow>(
+    `
+      SELECT value, type, organization, verdict, timestamp
+      FROM contact_feedback
+      WHERE organization_key = $1
+      ORDER BY updated_at DESC, timestamp DESC
+      LIMIT $2;
+    `,
+    [organizationKey, safeLimit]
   );
 
   return result.rows.map(toFeedbackEntry);
