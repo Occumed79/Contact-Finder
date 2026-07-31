@@ -7,7 +7,7 @@ import {
   Shield, Zap, Eye, Target, Radio, Database, Activity,
   ChevronRight, Copy, ExternalLink,
   CheckCircle2, Wifi, Crosshair, Radar as RadarIcon,
-  ThumbsUp, ThumbsDown,
+  Check, X,
 } from "lucide-react";
 import MatrixRain from "../components/MatrixRain";
 import Radar from "../components/Radar";
@@ -276,7 +276,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="mt-3 text-[10px] text-white/30 spy-text">
-                  Use 👍 / 👎 on results so the tool learns what is good and excludes junk next time.
+                  Use check / X on results so the tool learns what is good and excludes junk next time.
                 </p>
               </div>
 
@@ -340,22 +340,22 @@ export default function Home() {
                               onClick={() => sendFeedback(contact.value, contact.type, "good")}
                               className={`p-1.5 rounded-md border transition-colors ${
                                 feedbackMap[contact.value] === "good"
-                                  ? "bg-spy-green/20 border-spy-green/50 text-spy-green"
-                                  : "border-white/10 text-white/40 hover:text-spy-green hover:border-spy-green/30"
+                                  ? "bg-white/10 border-white/30 text-white"
+                                  : "border-white/10 text-white/40 hover:text-white/80 hover:border-white/30"
                               }`}
                             >
-                              <ThumbsUp className="w-3.5 h-3.5" />
+                              <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
                               title="Mark as junk — exclude next time"
                               onClick={() => sendFeedback(contact.value, contact.type, "bad")}
                               className={`p-1.5 rounded-md border transition-colors ${
                                 feedbackMap[contact.value] === "bad"
-                                  ? "bg-spy-red/20 border-spy-red/50 text-spy-red"
-                                  : "border-white/10 text-white/40 hover:text-spy-red hover:border-spy-red/30"
+                                  ? "bg-white/10 border-white/30 text-white"
+                                  : "border-white/10 text-white/40 hover:text-white/80 hover:border-white/30"
                               }`}
                             >
-                              <ThumbsDown className="w-3.5 h-3.5" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
