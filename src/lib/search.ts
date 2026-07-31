@@ -172,7 +172,9 @@ export async function searchDuckDuckGo(query: string): Promise<string> {
   const html = await res.text()
   const $ = cheerio.load(html)
   const snippets: string[] = []
-  $('.result__snippet').each((_, el) => snippets.push($(el).text()))
+  $('.result__snippet').each((_, el) => {
+    snippets.push($(el).text())
+  })
   $('.result__a').each((_, el) => {
     snippets.push($(el).text())
     snippets.push($(el).attr('href') || '')
@@ -187,7 +189,9 @@ export async function searchBingHTML(query: string): Promise<string> {
   const html = await res.text()
   const $ = cheerio.load(html)
   const snippets: string[] = []
-  $('.b_caption p, .b_algo p, li.b_algo .b_paractl').each((_, el) => snippets.push($(el).text()))
+  $('.b_caption p, .b_algo p, li.b_algo .b_paractl').each((_, el) => {
+    snippets.push($(el).text())
+  })
   $('li.b_algo h2 a').each((_, el) => {
     snippets.push($(el).attr('href') || '')
     snippets.push($(el).text())
@@ -202,10 +206,12 @@ export async function searchGoogleScrape(query: string): Promise<string> {
   const html = await res.text()
   const $ = cheerio.load(html)
   const snippets: string[] = []
-  $('div[data-sokoban-container] span, .VwiC3b, .s3v94d, .g span, .g .VwiC3b').each((_, el) =>
+  $('div[data-sokoban-container] span, .VwiC3b, .s3v94d, .g span, .g .VwiC3b').each((_, el) => {
     snippets.push($(el).text())
-  )
-  $('a[href^="/url"]').each((_, el) => snippets.push($(el).text()))
+  })
+  $('a[href^="/url"]').each((_, el) => {
+    snippets.push($(el).text())
+  })
   return snippets.join(' ')
 }
 
