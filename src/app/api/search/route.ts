@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { multiDimensionSearch } from "../../../lib/scrapers/orchestrator";
-import { generateMockIntelligence, expandQuery, scoreSignals, calculateConfidence, buildIntelligenceObject, type Vertical } from "../../../lib/intelligence";
+import {
+  expandQuery,
+  buildIntelligenceObject,
+  type Vertical,
+} from "../../../lib/intelligence";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,18 +15,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const targetVertical = vertical || 'contact';
+    // Default to contact vertical — this app is a LinkedIn + email finder
+    const targetVertical: Vertical = vertical || "contact";
 
     try {
-      // Run multi-dimensional search
       const multiResult = await multiDimensionSearch(query, targetVertical);
 
-      // If we got real contacts, build intelligence object
       if (multiResult.contacts.length > 0) {
         const expanded = expandQuery(query, targetVertical);
-        const allText = multiResult.rawTexts.join(' ');
-        const signals = scoreSignals(allText);
-
         const intelligenceObject = buildIntelligenceObject(
           query,
           expanded,
@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
           undefined
         );
 
-        // Add method breakdown to response for transparency
         return NextResponse.json({
           ...intelligenceObject,
           methodBreakdown: multiResult.methodBreakdown,
@@ -41,23 +40,37 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // If no contacts found, fall back to mock intelligence
-      console.warn("Multi-dimensional search found no contacts, falling back to mock");
-      const mockResult = generateMockIntelligence(query, targetVertical);
+      // Real search ran but found nothing — return empty results with a clear note.
+      // Do NOT invent fake contacts.
+      console.warn("Multi-dimensional search found no contacts");
+      const expanded = expandQuery(query, targetVertical);
       return NextResponse.json({
-        ...mockResult,
+        organization: query,
+        vertical: targetVertical,
+        confidence: 0,
+        contacts: [],
+        signals: [],
+        sources: multiResult.sources,
+        queryExpansions: expanded.expansions,
+        timestamp: new Date().toISOString(),
+        note: "No LinkedIn profiles or emails found for this organization. Try a more specific company name, full legal name, or check spelling.",
         methodBreakdown: multiResult.methodBreakdown,
         totalMethodsAttempted: multiResult.totalMethodsAttempted,
         successfulMethods: multiResult.successfulMethods,
-        note: "No real contacts found. Showing demonstration data.",
       });
     } catch (err) {
       console.error("Multi-dimensional search failed:", err);
-      // Final fallback to mock
-      const mockResult = generateMockIntelligence(query, targetVertical);
+      const expanded = expandQuery(query, targetVertical);
       return NextResponse.json({
-        ...mockResult,
-        note: "All search methods failed. Showing demonstration data.",
+        organization: query,
+        vertical: targetVertical,
+        confidence: 0,
+        contacts: [],
+        signals: [],
+        sources: [],
+        queryExpansions: expanded.expansions,
+        timestamp: new Date().toISOString(),
+        note: "Search methods failed (network or scraper limits). No contact data available. Try again later or use a different organization name.",
       });
     }
   } catch (error) {

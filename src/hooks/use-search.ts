@@ -19,7 +19,8 @@ interface UseSearchReturn {
 
 export function useSearch(): UseSearchReturn {
   const [query, setQuery] = useState("");
-  const [vertical, setVertical] = useState<Vertical>("general");
+  // Default to contact — LinkedIn + email finder
+  const [vertical, setVertical] = useState<Vertical>("contact");
   const [intelligence, setIntelligence] = useState<IntelligenceObject | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,6 @@ export function useSearch(): UseSearchReturn {
       setHasSearched(true);
       setSearchTime(performance.now() - startTime);
 
-      // Mock suggestions based on query expansions
       if (data.queryExpansions?.length) {
         setSuggestions(
           data.queryExpansions.map((text, i) => ({
