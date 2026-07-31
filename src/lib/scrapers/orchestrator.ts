@@ -6,18 +6,18 @@ import { searchScrapeGraphAI, scrapeGraphAIDirectSearch } from './scrapegraph-sc
 import { searchGemini, geminiDirectSearch } from './gemini-scraper'
 import { searchApify, apifyGoogleSearch } from './apify-scraper'
 import { searchFirecrawl, firecrawlMap } from './firecrawl-scraper'
-import { extractEmails, extractPhones, extractLinkedIn, extractWebsites, extractFax, buildContactQueries } from '../search'
-import type { Vertical } from '../intelligence'
+import {
+  extractEmails,
+  extractLinkedIn,
+  extractEmployees,
+  buildContactQueries,
+  buildContactsFromText,
+} from '../search'
+import type { ContactResult } from '../../types/search'
+import { applyLearningFilter } from '../learning'
 
 export interface MultiDimensionResult {
-  contacts: Array<{
-    id: string
-    type: 'phone' | 'email' | 'fax' | 'linkedin' | 'website'
-    value: string
-    label: string
-    source: string
-    confidence: number
-  }>
+  contacts: ContactResult[]
   sources: string[]
   rawTexts: string[]
   methodBreakdown: {
@@ -34,11 +34,8 @@ export interface MultiDimensionResult {
   successfulMethods: number
 }
 
-export async function multiDimensionSearch(
-  query: string,
-  vertical: Vertical
-): Promise<MultiDimensionResult> {
-  const contacts: MultiDimensionResult['contacts'] = []
+export async function multiDimensionSearch(query: string): Promise<MultiDimensionResult> {
+  const contacts: ContactResult[] = []
   const sources: string[] = []
   const rawTexts: string[] = []
 
@@ -54,350 +51,222 @@ export async function multiDimensionSearch(
   }
 
   let id = 1
-  const addContact = (
-    type: 'phone' | 'email' | 'fax' | 'linkedin' | 'website',
-    value: string,
-    label: string,
-    source: string,
-    confidence: number
-  ) => {
-    if (!contacts.find(c => c.value.toLowerCase() === value.toLowerCase())) {
-      contacts.push({ id: String(id++), type, value, label, source, confidence })
+  const addContact = (c: Omit<ContactResult, 'id'>) => {
+    if (!contacts.find(x => x.value.toLowerCase() === c.value.toLowerCase() && x.type === c.type)) {
+      contacts.push({ ...c, id: String(id++) })
     }
   }
 
-  // Prefer contact-focused queries when in contact vertical
-  const searchQuery =
-    vertical === 'contact'
-      ? buildContactQueries(query)[0] || query
-      : query
+  const mergeFromText = (text: string, source: string, confidenceBase = 80) => {
+    if (text.length < 40) return
+    rawTexts.push(text)
+    const built = buildContactsFromText(text, [source], query)
+    for (const c of built) {
+      addContact({
+        type: c.type,
+        value: c.value,
+        label: c.label,
+        source,
+        confidence: Math.min(100, Math.round((c.confidence + confidenceBase) / 2)),
+        title: c.title,
+        linkedinUrl: c.linkedinUrl,
+      })
+    }
+  }
 
-  // ── Dimension 1: Playwright Headless Browser ──
+  // ── 1. Playwright ──
   try {
     const scraper = await getPlaywrightScraper()
+    const queries = buildContactQueries(query).slice(0, 3)
+    const texts: string[] = []
+    const urls: string[] = []
 
-    const queriesToRun =
-      vertical === 'contact'
-        ? buildContactQueries(query).slice(0, 3)
-        : [searchQuery]
-
-    const playwrightTexts: string[] = []
-    const playwrightUrls: string[] = []
-
-    for (const q of queriesToRun) {
-      const [googleResult, bingResult, ddgResult] = await Promise.allSettled([
+    for (const q of queries) {
+      const [g, b, d] = await Promise.allSettled([
         scraper.searchGoogle(q, 10),
         scraper.searchBing(q, 10),
         scraper.searchDuckDuckGo(q),
       ])
-
-      if (googleResult.status === 'fulfilled' && googleResult.value.success) {
-        playwrightTexts.push(googleResult.value.text)
-        playwrightUrls.push(...googleResult.value.urls)
+      if (g.status === 'fulfilled' && g.value.success) {
+        texts.push(g.value.text)
+        urls.push(...g.value.urls)
         methodBreakdown.playwright.sources.push('Google (Playwright)')
       }
-      if (bingResult.status === 'fulfilled' && bingResult.value.success) {
-        playwrightTexts.push(bingResult.value.text)
-        playwrightUrls.push(...bingResult.value.urls)
+      if (b.status === 'fulfilled' && b.value.success) {
+        texts.push(b.value.text)
+        urls.push(...b.value.urls)
         methodBreakdown.playwright.sources.push('Bing (Playwright)')
       }
-      if (ddgResult.status === 'fulfilled' && ddgResult.value.success) {
-        playwrightTexts.push(ddgResult.value.text)
-        playwrightUrls.push(...ddgResult.value.urls)
+      if (d.status === 'fulfilled' && d.value.success) {
+        texts.push(d.value.text)
+        urls.push(...d.value.urls)
         methodBreakdown.playwright.sources.push('DuckDuckGo (Playwright)')
       }
     }
 
-    const combinedPlaywrightText = playwrightTexts.join(' ')
-    if (combinedPlaywrightText.length > 50) {
+    const combined = texts.join(' ')
+    if (combined.length > 50) {
       methodBreakdown.playwright.success = true
-      rawTexts.push(combinedPlaywrightText)
-
-      const emails = extractEmails(combinedPlaywrightText, query)
-      const linkedins = extractLinkedIn(combinedPlaywrightText, query)
-      const phones = extractPhones(combinedPlaywrightText)
-      const websites = extractWebsites(combinedPlaywrightText)
-      const faxes = extractFax(combinedPlaywrightText)
-
-      emails.forEach((email, i) => addContact('email', email, i === 0 ? 'Email' : `Email ${i + 1}`, 'Playwright Search', 85))
-      linkedins.forEach((linkedin, i) =>
-        addContact(
-          'linkedin',
-          linkedin,
-          linkedin.includes('/company/') ? 'LinkedIn Company' : `LinkedIn ${i + 1}`,
-          'Playwright Search',
-          linkedin.includes('/company/') ? 92 : 80
-        )
-      )
-      // Secondary: phones/websites only if we have few core contacts
-      if (emails.length + linkedins.length < 3) {
-        phones.slice(0, 3).forEach((phone, i) => addContact('phone', phone, i === 0 ? 'Phone' : `Phone ${i + 1}`, 'Playwright Search', 70))
-        websites.slice(0, 2).forEach((website, i) => addContact('website', website, i === 0 ? 'Website' : `Website ${i + 1}`, 'Playwright Search', 75))
-        faxes.slice(0, 1).forEach((fax, i) => addContact('fax', fax, 'Fax', 'Playwright Search', 60))
-      }
-
+      mergeFromText(combined, 'Playwright Search', 85)
       sources.push(...methodBreakdown.playwright.sources)
     }
 
-    // Scrape top company-like URLs
-    if (playwrightUrls.length > 0) {
-      const topUrls = [...new Set(playwrightUrls)].slice(0, 3)
-      for (const url of topUrls) {
-        try {
-          const pageResult = await scraper.scrapeUrl(url)
-          if (pageResult.success && pageResult.text.length > 50) {
-            rawTexts.push(pageResult.text)
-            sources.push(`Direct: ${new URL(url).hostname}`)
-
-            const emails = extractEmails(pageResult.text, query)
-            const linkedins = extractLinkedIn(pageResult.text, query)
-            emails.forEach((email, i) => addContact('email', email, `Website Email ${i + 1}`, `Direct: ${new URL(url).hostname}`, 88))
-            linkedins.forEach((li) => addContact('linkedin', li, 'LinkedIn from page', `Direct: ${new URL(url).hostname}`, 90))
-          }
-        } catch {
-          // continue
+    for (const url of [...new Set(urls)].slice(0, 3)) {
+      try {
+        const page = await scraper.scrapeUrl(url)
+        if (page.success && page.text.length > 50) {
+          mergeFromText(page.text, `Direct: ${new URL(url).hostname}`, 88)
+          sources.push(`Direct: ${new URL(url).hostname}`)
         }
+      } catch {
+        /* skip */
       }
     }
-  } catch (error) {
-    console.error('Playwright dimension failed:', error)
+  } catch (e) {
+    console.error('Playwright failed:', e)
   }
 
-  // ── Dimension 2: CORS Proxy ──
+  // ── 2. CORS Proxy ──
   try {
-    const proxyQueries =
-      vertical === 'contact' ? buildContactQueries(query).slice(0, 2) : [query]
-
-    const corsTexts: string[] = []
-    for (const q of proxyQueries) {
-      const [googleProxy, bingProxy, ddgProxy] = await Promise.allSettled([
+    const texts: string[] = []
+    for (const q of buildContactQueries(query).slice(0, 2)) {
+      const [g, b, d] = await Promise.allSettled([
         searchGoogleViaProxy(q),
         searchBingViaProxy(q),
         searchDuckDuckGoViaProxy(q),
       ])
-
-      if (googleProxy.status === 'fulfilled' && googleProxy.value.success) {
-        corsTexts.push(googleProxy.value.text)
-        methodBreakdown.corsProxy.sources.push('Google (CORS Proxy)')
+      if (g.status === 'fulfilled' && g.value.success) {
+        texts.push(g.value.text)
+        methodBreakdown.corsProxy.sources.push('Google (CORS)')
       }
-      if (bingProxy.status === 'fulfilled' && bingProxy.value.success) {
-        corsTexts.push(bingProxy.value.text)
-        methodBreakdown.corsProxy.sources.push('Bing (CORS Proxy)')
+      if (b.status === 'fulfilled' && b.value.success) {
+        texts.push(b.value.text)
+        methodBreakdown.corsProxy.sources.push('Bing (CORS)')
       }
-      if (ddgProxy.status === 'fulfilled' && ddgProxy.value.success) {
-        corsTexts.push(ddgProxy.value.text)
-        methodBreakdown.corsProxy.sources.push('DuckDuckGo (CORS Proxy)')
+      if (d.status === 'fulfilled' && d.value.success) {
+        texts.push(d.value.text)
+        methodBreakdown.corsProxy.sources.push('DuckDuckGo (CORS)')
       }
     }
-
-    const combinedCorsText = corsTexts.join(' ')
-    if (combinedCorsText.length > 50) {
+    const combined = texts.join(' ')
+    if (combined.length > 50) {
       methodBreakdown.corsProxy.success = true
-      rawTexts.push(combinedCorsText)
-
-      const emails = extractEmails(combinedCorsText, query)
-      const linkedins = extractLinkedIn(combinedCorsText, query)
-      emails.forEach((email, i) => addContact('email', email, `CORS Email ${i + 1}`, 'CORS Proxy', 80))
-      linkedins.forEach((linkedin, i) =>
-        addContact('linkedin', linkedin, linkedin.includes('/company/') ? 'LinkedIn Company' : `CORS LinkedIn ${i + 1}`, 'CORS Proxy', 83)
-      )
-
+      mergeFromText(combined, 'CORS Proxy', 78)
       sources.push(...methodBreakdown.corsProxy.sources)
     }
-  } catch (error) {
-    console.error('CORS proxy dimension failed:', error)
+  } catch (e) {
+    console.error('CORS failed:', e)
   }
 
-  // ── Dimension 3: Search APIs ──
+  // ── 3. Search APIs (Serper / SerpAPI) — highest priority when keys present ──
   try {
-    const apiResults = await searchAllApis(query)
-
-    for (const result of apiResults) {
-      if (result.success && result.text.length > 50) {
-        methodBreakdown.api.success = true
-        methodBreakdown.api.sources.push(result.source)
-        rawTexts.push(result.text)
-
-        const emails = extractEmails(result.text, query)
-        const linkedins = extractLinkedIn(result.text, query)
-        emails.forEach((email, i) => addContact('email', email, `API Email ${i + 1}`, result.source, 92))
-        linkedins.forEach((linkedin, i) => addContact('linkedin', linkedin, `API LinkedIn ${i + 1}`, result.source, 94))
-
-        sources.push(result.source)
+    for (const q of buildContactQueries(query).slice(0, 3)) {
+      const apiResults = await searchAllApis(q)
+      for (const result of apiResults) {
+        if (result.success && result.text.length > 50) {
+          methodBreakdown.api.success = true
+          methodBreakdown.api.sources.push(result.source)
+          mergeFromText(result.text, result.source, 92)
+          sources.push(result.source)
+        }
       }
     }
-  } catch (error) {
-    console.error('API dimension failed:', error)
+  } catch (e) {
+    console.error('API failed:', e)
   }
 
-  // ── Dimension 4: Direct Source Scraping (LinkedIn company, website, etc.) ──
+  // ── 4. Direct sources (LinkedIn company, website) ──
   try {
-    const directResults = await scrapeAllDirectSources(query, vertical)
-
+    const directResults = await scrapeAllDirectSources(query, 'contact')
     for (const result of directResults) {
       if (result.success && result.contacts.length > 0) {
         methodBreakdown.direct.success = true
         methodBreakdown.direct.sources.push(result.source)
-
-        for (const contact of result.contacts) {
-          // Re-filter emails through our stricter extractor when possible
-          if (contact.type === 'email') {
-            const cleaned = extractEmails(contact.value, query)
-            if (cleaned.length === 0 && extractEmails(contact.value).length === 0) continue
+        for (const c of result.contacts) {
+          if (c.type === 'email' || c.type === 'linkedin') {
+            addContact({
+              type: c.type as 'email' | 'linkedin',
+              value: c.value,
+              label: c.label,
+              source: result.source,
+              confidence: c.confidence,
+            })
           }
-          addContact(contact.type, contact.value, contact.label, `${result.source} (${contact.source})`, contact.confidence)
         }
-
         sources.push(result.source)
       }
     }
-  } catch (error) {
-    console.error('Direct scraping dimension failed:', error)
+  } catch (e) {
+    console.error('Direct failed:', e)
   }
 
-  // ── Dimensions 5–8: optional paid/AI services (only add if they return contacts) ──
-  try {
-    const [sgResult, sgDirectResult] = await Promise.allSettled([
-      searchScrapeGraphAI(query),
-      scrapeGraphAIDirectSearch(query),
-    ])
-
-    if (sgResult.status === 'fulfilled' && sgResult.value.success) {
-      methodBreakdown.scrapegraph.success = true
-      methodBreakdown.scrapegraph.sources.push('ScrapeGraphAI')
-      rawTexts.push(sgResult.value.text)
-      for (const contact of sgResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'ScrapeGraphAI', 93)
+  // ── 5–8 Optional paid services ──
+  const runOptional = async (
+    key: keyof typeof methodBreakdown,
+    label: string,
+    fns: Array<() => Promise<{ success: boolean; text: string; contacts?: Array<{ type: string; value: string; label: string }> }>>
+  ) => {
+    try {
+      const settled = await Promise.allSettled(fns.map(f => f()))
+      for (const r of settled) {
+        if (r.status === 'fulfilled' && r.value.success) {
+          methodBreakdown[key].success = true
+          methodBreakdown[key].sources.push(label)
+          if (r.value.text) mergeFromText(r.value.text, label, 90)
+          if (r.value.contacts) {
+            for (const c of r.value.contacts) {
+              if (c.type === 'email' || c.type === 'linkedin') {
+                addContact({
+                  type: c.type as 'email' | 'linkedin',
+                  value: c.value,
+                  label: c.label,
+                  source: label,
+                  confidence: 90,
+                })
+              }
+            }
+          }
+          sources.push(label)
+        }
       }
-      sources.push('ScrapeGraphAI')
+    } catch (e) {
+      console.error(`${label} failed:`, e)
     }
-
-    if (sgDirectResult.status === 'fulfilled' && sgDirectResult.value.success) {
-      methodBreakdown.scrapegraph.success = true
-      methodBreakdown.scrapegraph.sources.push('ScrapeGraphAI Direct')
-      rawTexts.push(sgDirectResult.value.text)
-      for (const contact of sgDirectResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'ScrapeGraphAI Direct', 93)
-      }
-      sources.push('ScrapeGraphAI Direct')
-    }
-  } catch (error) {
-    console.error('ScrapeGraphAI dimension failed:', error)
   }
 
-  try {
-    const [geminiResult, geminiDirectResult] = await Promise.allSettled([
-      searchGemini(query),
-      geminiDirectSearch(query),
-    ])
-
-    if (geminiResult.status === 'fulfilled' && geminiResult.value.success) {
-      methodBreakdown.gemini.success = true
-      methodBreakdown.gemini.sources.push('Gemini')
-      rawTexts.push(geminiResult.value.text)
-      for (const contact of geminiResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Gemini', 94)
-      }
-      sources.push('Gemini')
-    }
-
-    if (geminiDirectResult.status === 'fulfilled' && geminiDirectResult.value.success) {
-      methodBreakdown.gemini.success = true
-      methodBreakdown.gemini.sources.push('Gemini Direct')
-      rawTexts.push(geminiDirectResult.value.text)
-      for (const contact of geminiDirectResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Gemini Direct', 94)
-      }
-      sources.push('Gemini Direct')
-    }
-  } catch (error) {
-    console.error('Gemini dimension failed:', error)
-  }
-
-  try {
-    const [apifyResult, apifyGoogleResult] = await Promise.allSettled([
-      searchApify(query),
-      apifyGoogleSearch(query),
-    ])
-
-    if (apifyResult.status === 'fulfilled' && apifyResult.value.success) {
-      methodBreakdown.apify.success = true
-      methodBreakdown.apify.sources.push('Apify')
-      rawTexts.push(apifyResult.value.text)
-      for (const contact of apifyResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Apify', 92)
-      }
-      sources.push('Apify')
-    }
-
-    if (apifyGoogleResult.status === 'fulfilled' && apifyGoogleResult.value.success) {
-      methodBreakdown.apify.success = true
-      methodBreakdown.apify.sources.push('Apify Google Search')
-      rawTexts.push(apifyGoogleResult.value.text)
-      for (const contact of apifyGoogleResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Apify Google Search', 92)
-      }
-      sources.push('Apify Google Search')
-    }
-  } catch (error) {
-    console.error('Apify dimension failed:', error)
-  }
-
-  try {
-    const [firecrawlResult, firecrawlMapResult] = await Promise.allSettled([
-      searchFirecrawl(query),
-      firecrawlMap(query),
-    ])
-
-    if (firecrawlResult.status === 'fulfilled' && firecrawlResult.value.success) {
-      methodBreakdown.firecrawl.success = true
-      methodBreakdown.firecrawl.sources.push('Firecrawl')
-      rawTexts.push(firecrawlResult.value.text)
-      for (const contact of firecrawlResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Firecrawl', 93)
-      }
-      sources.push('Firecrawl')
-    }
-
-    if (firecrawlMapResult.status === 'fulfilled' && firecrawlMapResult.value.success) {
-      methodBreakdown.firecrawl.success = true
-      methodBreakdown.firecrawl.sources.push('Firecrawl Map')
-      rawTexts.push(firecrawlMapResult.value.text)
-      for (const contact of firecrawlMapResult.value.contacts) {
-        addContact(contact.type, contact.value, contact.label, 'Firecrawl Map', 93)
-      }
-      sources.push('Firecrawl Map')
-    }
-  } catch (error) {
-    console.error('Firecrawl dimension failed:', error)
-  }
+  await runOptional('scrapegraph', 'ScrapeGraphAI', [
+    () => searchScrapeGraphAI(query),
+    () => scrapeGraphAIDirectSearch(query),
+  ])
+  await runOptional('gemini', 'Gemini', [
+    () => searchGemini(query),
+    () => geminiDirectSearch(query),
+  ])
+  await runOptional('apify', 'Apify', [
+    () => searchApify(query),
+    () => apifyGoogleSearch(query),
+  ])
+  await runOptional('firecrawl', 'Firecrawl', [
+    () => searchFirecrawl(query),
+    () => firecrawlMap(query),
+  ])
 
   await closePlaywrightScraper()
 
-  // Prefer LinkedIn + email; demote pure phone/fax/website when core contacts exist
-  const hasCore = contacts.some(c => c.type === 'email' || c.type === 'linkedin')
-  const finalContacts = hasCore
-    ? contacts.filter(c => c.type === 'email' || c.type === 'linkedin' || c.type === 'website').slice(0, 25)
-    : contacts.slice(0, 15)
+  // Learning filter
+  const filtered = applyLearningFilter(contacts, query)
 
-  const totalMethodsAttempted = 8
-  const successfulMethods = [
-    methodBreakdown.playwright.success,
-    methodBreakdown.corsProxy.success,
-    methodBreakdown.api.success,
-    methodBreakdown.direct.success,
-    methodBreakdown.scrapegraph.success,
-    methodBreakdown.gemini.success,
-    methodBreakdown.apify.success,
-    methodBreakdown.firecrawl.success,
-  ].filter(Boolean).length
+  // Prefer emails + linkedin + employees only (already the only types)
+  const finalContacts = filtered.slice(0, 40)
+
+  const successfulMethods = Object.values(methodBreakdown).filter(m => m.success).length
 
   return {
     contacts: finalContacts,
     sources: [...new Set(sources)],
     rawTexts,
     methodBreakdown,
-    totalMethodsAttempted,
+    totalMethodsAttempted: 8,
     successfulMethods,
   }
 }
