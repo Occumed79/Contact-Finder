@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import type { IntelligenceObject, SearchSuggestion, ContactType, FeedbackEntry } from "../types/search";
-import { recordClientFeedback } from "../lib/learning";
 
 interface UseSearchReturn {
   query: string;
@@ -82,17 +81,22 @@ export function useSearch(): UseSearchReturn {
         verdict,
         timestamp: new Date().toISOString(),
       };
-      recordClientFeedback(entry);
+
+      // Optimistic UI only. Persistence is handled by the server through Neon/DATABASE_URL.
       setFeedbackMap((prev) => ({ ...prev, [value]: verdict }));
 
       try {
-        await fetch("/api/feedback", {
+        const response = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(entry),
         });
-      } catch {
-        // local storage still recorded
+
+        if (!response.ok) {
+          throw new Error(`Feedback save failed: ${response.statusText}`);
+        }
+      } catch (err) {
+        console.warn("Feedback was not persisted:", err);
       }
     },
     [intelligence]
