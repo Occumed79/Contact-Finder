@@ -276,7 +276,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="mt-3 text-[10px] text-white/30 spy-text">
-                  Use check / X on results so the tool learns what is good and excludes junk next time.
+                  Use ✓ / ✕ on results so the tool learns what is good and excludes junk next time.
                 </p>
               </div>
 
