@@ -1,43 +1,42 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Phone, Mail, Printer, Linkedin, Globe,
+  Search, Mail, Linkedin, Users,
   Shield, Zap, Eye, Target, Radio, Database, Activity,
-  ChevronRight, Copy, ExternalLink, AlertTriangle,
+  ChevronRight, Copy, ExternalLink,
   CheckCircle2, Wifi, Crosshair, Radar as RadarIcon,
+  ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import MatrixRain from "../components/MatrixRain";
 import Radar from "../components/Radar";
 import GlobeVis from "../components/Globe";
 import { useSearch } from "../hooks/use-search";
-import { type Vertical } from "../types/search";
+import type { ContactType, ContactResult } from "../types/search";
 
-const VERTICALS = [
-  { id: "contact", label: "CONTACT", icon: Phone, color: "text-spy-cyan" },
-  { id: "procurement", label: "PROCUREMENT", icon: Target, color: "text-spy-green" },
-  { id: "provider", label: "PROVIDER", icon: Database, color: "text-spy-purple" },
-  { id: "pricing", label: "PRICING", icon: Activity, color: "text-spy-amber" },
-  { id: "general", label: "GENERAL", icon: Zap, color: "text-slate-400" },
+const LENSES: { id: ContactType | "all"; label: string; icon: typeof Mail; color: string }[] = [
+  { id: "all", label: "ALL", icon: Zap, color: "text-slate-300" },
+  { id: "email", label: "EMAILS", icon: Mail, color: "text-spy-cyan" },
+  { id: "linkedin", label: "LINKEDIN", icon: Linkedin, color: "text-blue-400" },
+  { id: "employee", label: "EMPLOYEES", icon: Users, color: "text-spy-green" },
 ];
 
 function ContactTypeIcon({ type }: { type: string }) {
   switch (type) {
-    case "phone": return <Phone className="w-4 h-4 text-spy-green" />;
     case "email": return <Mail className="w-4 h-4 text-spy-cyan" />;
-    case "fax": return <Printer className="w-4 h-4 text-spy-amber" />;
     case "linkedin": return <Linkedin className="w-4 h-4 text-blue-400" />;
-    case "website": return <Globe className="w-4 h-4 text-spy-purple" />;
-    default: return <Globe className="w-4 h-4 text-slate-400" />;
+    case "employee": return <Users className="w-4 h-4 text-spy-green" />;
+    default: return <Mail className="w-4 h-4 text-slate-400" />;
   }
 }
 
 export default function Home() {
   const {
-    query, setQuery, vertical, setVertical,
+    query, setQuery, activeLens, setActiveLens,
     intelligence, isLoading, error,
     hasSearched, performSearch,
+    sendFeedback, feedbackMap,
   } = useSearch();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -58,17 +57,39 @@ export default function Home() {
   const handleSearch = async () => {
     if (!query.trim()) return;
     setLogs([]);
-    addLog(`Vertical: ${vertical.toUpperCase()}`);
-    addLog("Expanding query semantics...");
+    addLog("Lens: EMAILS · LINKEDIN · EMPLOYEES");
+    addLog("Expanding contact queries...");
     await performSearch();
-    if (intelligence) {
-      addLog(`INTELLIGENCE ACQUIRED: ${intelligence.contacts?.length || 0} vectors | Confidence: ${intelligence.confidence}%`);
-    }
   };
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (intelligence) {
+      const emails = intelligence.contacts.filter(c => c.type === "email").length;
+      const linkedin = intelligence.contacts.filter(c => c.type === "linkedin").length;
+      const employees = intelligence.contacts.filter(c => c.type === "employee").length;
+      addLog(`ACQUIRED: ${emails} emails · ${linkedin} LinkedIn · ${employees} employees | Confidence: ${intelligence.confidence}%`);
+    }
+  }, [intelligence]);
+
+  const filteredContacts: ContactResult[] = useMemo(() => {
+    if (!intelligence?.contacts) return [];
+    if (activeLens === "all") return intelligence.contacts;
+    return intelligence.contacts.filter(c => c.type === activeLens);
+  }, [intelligence, activeLens]);
+
+  const counts = useMemo(() => {
+    const c = intelligence?.contacts || [];
+    return {
+      email: c.filter(x => x.type === "email").length,
+      linkedin: c.filter(x => x.type === "linkedin").length,
+      employee: c.filter(x => x.type === "employee").length,
+      all: c.length,
+    };
+  }, [intelligence]);
 
   return (
     <div className="min-h-screen bg-spy-black spy-grid-bg relative overflow-hidden">
@@ -92,7 +113,7 @@ export default function Home() {
               </h1>
               <div className="flex items-center gap-2">
                 <Radio className="w-3 h-3 text-spy-green data-pulse" />
-                <span className="text-[10px] spy-text text-spy-green tracking-widest">SYSTEM ACTIVE</span>
+                <span className="text-[10px] spy-text text-spy-green tracking-widest">EMAILS · LINKEDIN · EMPLOYEES</span>
               </div>
             </div>
           </div>
@@ -103,11 +124,11 @@ export default function Home() {
             </button>
             <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-full">
               <Database className="w-3.5 h-3.5 text-spy-purple" />
-              <span className="spy-text text-[10px] text-white/70">OSINT DATABASE</span>
+              <span className="spy-text text-[10px] text-white/70">OSINT</span>
             </div>
             <div className="flex items-center gap-2 glass-panel px-3 py-1.5 rounded-full">
               <Eye className="w-3.5 h-3.5 text-spy-cyan" />
-              <span className="spy-text text-[10px] text-white/70">STEALTH MODE</span>
+              <span className="spy-text text-[10px] text-white/70">LEARNING ON</span>
             </div>
           </div>
         </div>
@@ -139,22 +160,26 @@ export default function Home() {
               <Target className="w-5 h-5 text-spy-red" />
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Hunt Down <span className="text-spy-cyan glow-cyan">Contact Intel</span>
+              Find <span className="text-spy-cyan glow-cyan">Emails</span>, LinkedIn &amp; People
             </h2>
             <p className="text-white/50 text-sm max-w-xl mx-auto leading-relaxed">
-              Enter an organization name to scan corporate registries, social networks, and public directories for phone, fax, email, and LinkedIn intelligence.
+              Enter an organization name. Results are limited to real emails, LinkedIn profiles, and employees with titles — no phone/fax noise, no invented data.
             </p>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="mt-8 relative">
             <div className="glass-panel-luminous rounded-2xl p-1.5 luminous-border">
               <div className="flex gap-1 mb-1.5 px-1">
-                {VERTICALS.map((v) => (
-                  <button key={v.id} onClick={() => setVertical(v.id as Vertical)}
+                {LENSES.map((v) => (
+                  <button key={v.id} onClick={() => setActiveLens(v.id)}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg spy-text text-[10px] tracking-wider transition-all border ${
-                      vertical === v.id ? `${v.color} bg-white/10 border-white/20` : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
+                      activeLens === v.id ? `${v.color} bg-white/10 border-white/20` : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/5"
                     }`}>
-                    <v.icon className="w-3.5 h-3.5" />{v.label}
+                    <v.icon className="w-3.5 h-3.5" />
+                    {v.label}
+                    {hasSearched && intelligence && (
+                      <span className="opacity-60">({counts[v.id] ?? 0})</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -178,17 +203,17 @@ export default function Home() {
               <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Activity className="w-5 h-5 text-spy-cyan animate-pulse" />
-                  <h3 className="spy-text text-sm tracking-wider text-spy-cyan">SCANNING PROTOCOLS ACTIVE</h3>
+                  <h3 className="spy-text text-sm tracking-wider text-spy-cyan">SCANNING FOR EMAILS · LINKEDIN · PEOPLE</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                  {["CORP REGISTRY", "DNS SCAN", "LINKEDIN", "DIRECTORY"].map((src, i) => (
+                  {["SERPER / SERPAPI", "LINKEDIN", "COMPANY WEB", "LEADERSHIP"].map((src, i) => (
                     <div key={src} className="glass-panel rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <div className={`w-2 h-2 rounded-full ${logs.length > i * 2 ? "bg-spy-green" : "bg-white/20"}`} />
                         <span className="spy-text text-[10px] text-white/60">{src}</span>
                       </div>
                       <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                        <motion.div className="h-full bg-spy-cyan rounded-full" initial={{ width: 0 }} animate={{ width: logs.length > i * 2 ? "100%" : "0%" }} transition={{ duration: 0.5 }} />
+                        <motion.div className="h-full bg-spy-cyan rounded-full" initial={{ width: 0 }} animate={{ width: logs.length > i * 2 ? "100%" : "30%" }} transition={{ duration: 1.2, repeat: isLoading ? Infinity : 0 }} />
                       </div>
                     </div>
                   ))}
@@ -203,7 +228,13 @@ export default function Home() {
             </motion.div>
           )}
 
-          {intelligence && intelligence.contacts && (
+          {error && (
+            <div className="max-w-3xl mx-auto mb-6 glass-panel rounded-xl p-4 border border-spy-red/30">
+              <p className="text-spy-red text-sm spy-text">{error}</p>
+            </div>
+          )}
+
+          {intelligence && (
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-5xl mx-auto">
               <div className="glass-panel-luminous rounded-2xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">
@@ -211,20 +242,22 @@ export default function Home() {
                     <CheckCircle2 className="w-6 h-6 text-spy-green" />
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`spy-text text-[10px] tracking-widest px-2 py-0.5 rounded bg-white/10 ${intelligence.vertical === "procurement" ? "text-spy-green" : intelligence.vertical === "provider" ? "text-spy-purple" : intelligence.vertical === "pricing" ? "text-spy-amber" : "text-spy-cyan"}`}>{intelligence.vertical?.toUpperCase() || "CONTACT"}</span>
+                        <span className="spy-text text-[10px] tracking-widest px-2 py-0.5 rounded bg-white/10 text-spy-cyan">CONTACT INTEL</span>
                       </div>
                       <h3 className="text-xl font-bold text-white">{intelligence.organization}</h3>
-                      <p className="text-xs text-white/50 spy-text">{intelligence.contacts.length} contact vectors identified</p>
+                      <p className="text-xs text-white/50 spy-text">
+                        {counts.email} emails · {counts.linkedin} LinkedIn · {counts.employee} employees
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="spy-text text-[10px] text-white/40">CONFIDENCE SCORE</div>
+                    <div className="spy-text text-[10px] text-white/40">CONFIDENCE</div>
                     <div className="text-2xl font-bold text-spy-green spy-text">{intelligence.confidence}%</div>
                   </div>
                 </div>
                 {intelligence.signals && intelligence.signals.length > 0 && (
                   <div className="mb-4">
-                    <div className="spy-text text-[10px] text-white/40 tracking-widest mb-2">INTELLIGENCE SIGNALS</div>
+                    <div className="spy-text text-[10px] text-white/40 tracking-widest mb-2">SIGNALS</div>
                     <div className="flex flex-wrap gap-2">
                       {intelligence.signals.map((sig, i) => (
                         <span key={i} title={sig.description} className={`spy-text text-[10px] px-2 py-1 rounded-full border ${sig.score > 0 ? "bg-spy-green/10 text-spy-green border-spy-green/30" : "bg-spy-red/10 text-spy-red border-spy-red/30"}`}>{sig.name} {sig.score > 0 ? "+" : ""}{sig.score}</span>
@@ -242,41 +275,95 @@ export default function Home() {
                     <span key={source} className="spy-text text-[10px] px-2 py-1 rounded-full bg-white/5 text-white/50 border border-white/10">{source}</span>
                   ))}
                 </div>
+                <p className="mt-3 text-[10px] text-white/30 spy-text">
+                  Use 👍 / 👎 on results so the tool learns what is good and excludes junk next time.
+                </p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                {intelligence.contacts.map((contact, index) => (
-                  <motion.div key={contact.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
-                    <div className="glass-panel-luminous rounded-xl p-4 luminous-border group hover:bg-white/[0.06] transition-all">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><ContactTypeIcon type={contact.type} /></div>
-                          <div><div className="text-[10px] uppercase tracking-widest text-white/40">{contact.type}</div><div className="text-sm font-medium text-white">{contact.label}</div></div>
+              {filteredContacts.length === 0 ? (
+                <div className="glass-panel rounded-xl p-8 text-center">
+                  <p className="text-white/50 spy-text text-sm">No results in this lens. Try ALL or another organization name.</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {filteredContacts.map((contact, index) => (
+                    <motion.div key={contact.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
+                      <div className={`glass-panel-luminous rounded-xl p-4 luminous-border group hover:bg-white/[0.06] transition-all ${
+                        feedbackMap[contact.value] === "bad" ? "opacity-40" : ""
+                      }`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                              <ContactTypeIcon type={contact.type} />
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-widest text-white/40">{contact.type}</div>
+                              <div className="text-sm font-medium text-white">
+                                {contact.type === "employee" ? contact.value : contact.label}
+                              </div>
+                              {contact.type === "employee" && contact.title && (
+                                <div className="text-xs text-spy-green/80">{contact.title}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] text-white/40">Confidence</div>
+                            <div className={`text-xs font-bold ${contact.confidence > 85 ? "text-spy-green" : contact.confidence > 65 ? "text-spy-cyan" : "text-spy-amber"}`}>{contact.confidence}%</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-white/40">Confidence</div>
-                          <div className={`text-xs font-bold ${contact.confidence > 90 ? "text-spy-green" : contact.confidence > 70 ? "text-spy-cyan" : "text-spy-amber"}`}>{contact.confidence}%</div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <code className="flex-1 text-sm text-white bg-black/30 px-3 py-2 rounded-lg border border-white/10 truncate">
+                            {contact.type === "employee"
+                              ? (contact.linkedinUrl || contact.value)
+                              : contact.value}
+                          </code>
+                          <button onClick={() => copyToClipboard(
+                            contact.type === "employee" ? (contact.linkedinUrl || contact.value) : contact.value,
+                            contact.id
+                          )} className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
+                            {copiedId === contact.id ? <CheckCircle2 className="w-4 h-4 text-spy-green" /> : <Copy className="w-4 h-4 text-white/50" />}
+                          </button>
+                          {(contact.type === "linkedin" || contact.linkedinUrl) && (
+                            <a href={contact.linkedinUrl || contact.value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
+                              <ExternalLink className="w-4 h-4 text-white/50" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <ChevronRight className="w-3 h-3 text-white/40" />
+                            <span className="text-[10px] text-white/40">{contact.source}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              title="Mark as good — learn this"
+                              onClick={() => sendFeedback(contact.value, contact.type, "good")}
+                              className={`p-1.5 rounded-md border transition-colors ${
+                                feedbackMap[contact.value] === "good"
+                                  ? "bg-spy-green/20 border-spy-green/50 text-spy-green"
+                                  : "border-white/10 text-white/40 hover:text-spy-green hover:border-spy-green/30"
+                              }`}
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              title="Mark as junk — exclude next time"
+                              onClick={() => sendFeedback(contact.value, contact.type, "bad")}
+                              className={`p-1.5 rounded-md border transition-colors ${
+                                feedbackMap[contact.value] === "bad"
+                                  ? "bg-spy-red/20 border-spy-red/50 text-spy-red"
+                                  : "border-white/10 text-white/40 hover:text-spy-red hover:border-spy-red/30"
+                              }`}
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <code className="flex-1 text-sm text-white bg-black/30 px-3 py-2 rounded-lg border border-white/10 truncate">{contact.value}</code>
-                        <button onClick={() => copyToClipboard(contact.value, contact.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
-                          {copiedId === contact.id ? <CheckCircle2 className="w-4 h-4 text-spy-green" /> : <Copy className="w-4 h-4 text-white/50" />}
-                        </button>
-                        {(contact.type === "linkedin" || contact.type === "website") && (
-                          <a href={contact.value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 transition-colors border border-white/10">
-                            <ExternalLink className="w-4 h-4 text-white/50" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <ChevronRight className="w-3 h-3 text-white/40" />
-                        <span className="text-[10px] text-white/40">{contact.source}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

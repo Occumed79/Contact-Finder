@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { type IntelligenceObject, type Vertical, type SearchSuggestion } from "../types/search";
+import type { IntelligenceObject, SearchSuggestion, ContactType, FeedbackEntry } from "../types/search";
+import { recordClientFeedback } from "../lib/learning";
 
 interface UseSearchReturn {
   query: string;
   setQuery: (q: string) => void;
-  vertical: Vertical;
-  setVertical: (v: Vertical) => void;
+  activeLens: ContactType | "all";
+  setActiveLens: (l: ContactType | "all") => void;
   intelligence: IntelligenceObject | null;
   isLoading: boolean;
   error: string | null;
@@ -15,18 +16,20 @@ interface UseSearchReturn {
   hasSearched: boolean;
   searchTime: number;
   performSearch: () => Promise<void>;
+  sendFeedback: (value: string, type: ContactType, verdict: "good" | "bad") => Promise<void>;
+  feedbackMap: Record<string, "good" | "bad">;
 }
 
 export function useSearch(): UseSearchReturn {
   const [query, setQuery] = useState("");
-  // Default to contact — LinkedIn + email finder
-  const [vertical, setVertical] = useState<Vertical>("contact");
+  const [activeLens, setActiveLens] = useState<ContactType | "all">("all");
   const [intelligence, setIntelligence] = useState<IntelligenceObject | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchTime, setSearchTime] = useState(0);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, "good" | "bad">>({});
 
   const performSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -39,7 +42,7 @@ export function useSearch(): UseSearchReturn {
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, vertical }),
+        body: JSON.stringify({ query }),
       });
 
       if (!response.ok) {
@@ -67,13 +70,39 @@ export function useSearch(): UseSearchReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [query, vertical]);
+  }, [query]);
+
+  const sendFeedback = useCallback(
+    async (value: string, type: ContactType, verdict: "good" | "bad") => {
+      if (!intelligence) return;
+      const entry: FeedbackEntry = {
+        value,
+        type,
+        organization: intelligence.organization,
+        verdict,
+        timestamp: new Date().toISOString(),
+      };
+      recordClientFeedback(entry);
+      setFeedbackMap((prev) => ({ ...prev, [value]: verdict }));
+
+      try {
+        await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(entry),
+        });
+      } catch {
+        // local storage still recorded
+      }
+    },
+    [intelligence]
+  );
 
   return {
     query,
     setQuery,
-    vertical,
-    setVertical,
+    activeLens,
+    setActiveLens,
     intelligence,
     isLoading,
     error,
@@ -81,5 +110,7 @@ export function useSearch(): UseSearchReturn {
     hasSearched,
     searchTime,
     performSearch,
+    sendFeedback,
+    feedbackMap,
   };
 }
